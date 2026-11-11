@@ -1,6 +1,8 @@
 /**
- * Kiểu dữ liệu trang Xưởng vận hành – theo đúng JSON server cũ (web/server.js).
+ * File này: mô tả hình dạng dữ liệu (kiểu) của trang Xưởng vận hành – khớp JSON server cũ (web/server.js).
+ * Dùng ở: mọi component trong van-hanh; không vẽ gì lên màn hình.
  */
+// Xuất lại các kiểu PLC dùng chung để chỉ cần import từ "./types".
 export type {
   PlcHistoryResponse,
   PlcHistoryRow,
@@ -14,7 +16,7 @@ export type {
   PlcValue,
 } from "../_shared/plc-types";
 
-/** new = mới tạo, running = đang chạy (isPaused = tạm dừng), completed = hoàn thành. */
+/** Trạng thái đơn: new = mới tạo, running = đang chạy (isPaused = tạm dừng), completed = hoàn thành. */
 export type OrderStatus = "new" | "running" | "completed" | (string & {});
 
 /** Một dòng đơn hàng (orderFromRow cũ). Đơn "chạy thêm máy" là dòng con cùng parentOrderId. */
@@ -28,6 +30,7 @@ export interface Order {
   quantity: number;
   /** '/api/files/…' hoặc data-URL cũ; '' nếu không có. */
   imageData: string | null;
+  // Thông số kỹ thuật sản phẩm (độ trắng, cỡ hạt, khối lượng bao…).
   whiteness: string | null;
   grainSize: string | null;
   bagWeight: number | null;
@@ -37,22 +40,26 @@ export interface Order {
   pallet: string | null;
   extraBag: string | null;
   orderCommand: string;
+  // Số đã chạy trên máy.
   runOnMachine: number | null;
   actualProduced: number | null;
   status: OrderStatus;
   isPaused: boolean;
+  // Các mốc thời gian.
   exportDate: string | null;
   createdAt: string;
   completedAt: string | null;
   updatedAt: string | null;
+  // Người tạo / chạy / xác nhận, và máy đang chạy.
   creatorName: string | null;
   runnerName: string | null;
   confirmerName: string | null;
   machineName: string | null;
+  // Số lấy bù từ tồn kho.
   khoBu: number | null;
 }
 
-/** GET /api/orders */
+/** Kết quả GET /api/orders: danh sách đơn + quyền của người đang đăng nhập. */
 export interface OrdersResponse {
   orders: Order[];
   permissions: string[];
@@ -72,12 +79,13 @@ export interface HistoryLog {
   machine_name: string | null;
   user_name: string | null;
   action: string;
+  // Giá trị trước/sau khi sửa (nếu có).
   old_value: number | null;
   new_value: number | null;
   created_at: string;
 }
 
-/** Quyền thao tác đã tính sẵn cho giao diện. */
+/** Quyền thao tác đã tính sẵn để giao diện ẩn/hiện nút. */
 export interface OperatorPerms {
   /** Vận hành đơn (start/pause/resume/split, sửa "Đã chạy"). */
   canOperate: boolean;
@@ -88,6 +96,7 @@ export interface OperatorPerms {
   isSuper: boolean;
 }
 
+/** Đổi giá trị bất kỳ thành số; không hợp lệ thì trả 0. */
 export const num = (v: unknown) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;

@@ -1,19 +1,24 @@
-/** Định dạng hiển thị – luôn theo giờ Việt Nam, bất kể máy người dùng. */
+/**
+ * File này: hàm định dạng ngày giờ, số, dung lượng để hiển thị – luôn theo giờ Việt Nam, bất kể máy người dùng.
+ * Dùng ở: bảng, thẻ, hộp thoại khắp ứng dụng.
+ */
+// Múi giờ Việt Nam.
 export const VN_TZ = "Asia/Ho_Chi_Minh";
 
+/** Đổi giá trị thành Date; rỗng hoặc sai định dạng → null. */
 const toDate = (v: string | number | Date | null | undefined) => {
   if (v === null || v === undefined || v === "") return null;
   const d = v instanceof Date ? v : new Date(v);
   return Number.isNaN(d.getTime()) ? null : d;
 };
 
-/** 11/11/2026 */
+/** Ngày: 11/11/2026 */
 export function fmtDate(v: string | number | Date | null | undefined, fallback = "—") {
   const d = toDate(v);
   return d ? d.toLocaleDateString("vi-VN", { timeZone: VN_TZ, day: "2-digit", month: "2-digit", year: "numeric" }) : fallback;
 }
 
-/** 11/11/2026 14:05 */
+/** Ngày giờ: 11/11/2026 14:05 */
 export function fmtDateTime(v: string | number | Date | null | undefined, fallback = "—") {
   const d = toDate(v);
   return d
@@ -21,7 +26,7 @@ export function fmtDateTime(v: string | number | Date | null | undefined, fallba
     : fallback;
 }
 
-/** 14:05:09 */
+/** Giờ: 14:05:09 */
 export function fmtTime(v: string | number | Date | null | undefined, fallback = "—") {
   const d = toDate(v);
   return d ? d.toLocaleTimeString("vi-VN", { timeZone: VN_TZ, hour12: false }) : fallback;
@@ -39,10 +44,11 @@ export function fmtNumber(v: unknown, digits = 2, fallback = "—") {
   return n.toLocaleString("vi-VN", { maximumFractionDigits: digits });
 }
 
-/** "2 phút trước" */
+/** Thời gian tương đối: "2 phút trước" */
 export function fmtRelative(v: string | number | Date | null | undefined, fallback = "—") {
   const d = toDate(v);
   if (!d) return fallback;
+  // Chênh lệch (giây) so với bây giờ, rồi chọn đơn vị giây/phút/giờ/ngày.
   const diff = (d.getTime() - Date.now()) / 1000;
   const rtf = new Intl.RelativeTimeFormat("vi", { numeric: "auto" });
   const abs = Math.abs(diff);
@@ -52,6 +58,7 @@ export function fmtRelative(v: string | number | Date | null | undefined, fallba
   return rtf.format(Math.round(diff / 86400), "day");
 }
 
+/** Dung lượng file: B / KB / MB. */
 export function fmtBytes(n: number) {
   if (!Number.isFinite(n)) return "—";
   if (n < 1024) return `${n} B`;

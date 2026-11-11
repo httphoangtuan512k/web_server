@@ -1,16 +1,19 @@
 "use client";
+// File này: bộ "gạch" giao diện kiểu trang cũ (nút, thẻ, nhãn, bảng, ô nhập) giữ đúng màu bản gốc.
+// Dùng ở: mọi trang Quản trị. "Og" = original (bản gốc).
 
 import { Loader2 } from "lucide-react";
 import { forwardRef } from "react";
 import { cn } from "@/lib/cn";
 
 /**
- * Thành phần giao diện theo đúng mã màu / kiểu nút của các trang quản trị cũ.
+ * Các kiểu màu nút, lấy từ trang cũ:
  *  - admin.html / log.html: primary (navy #172b3a), default (trắng viền #cbd5e1), danger (chữ đỏ #b42318, viền #efc4c0), success (chữ xanh #16794b).
  *  - superdata.html: blue (#1746a2), soft (#e9eef5 / #334155), red (#b42318).
  */
 export type OgVariant = "primary" | "default" | "danger" | "success" | "blue" | "soft" | "red";
 
+// Màu nền/viền/chữ (và màu khi rê chuột) cho từng kiểu nút.
 const variants: Record<OgVariant, string> = {
   primary: "border-[#172b3a] bg-[#172b3a] text-white hover:border-[#244d68] hover:bg-[#244d68]",
   default: "border-[#cbd5e1] bg-white text-[#1e293b] hover:bg-[#edf2f6]",
@@ -21,23 +24,26 @@ const variants: Record<OgVariant, string> = {
   red: "border-[#b42318] bg-[#b42318] font-bold text-white hover:border-[#9b1c13] hover:bg-[#9b1c13]",
 };
 
+// Hai cỡ nút: md (vừa, mặc định) và sm (nhỏ, dùng trong bảng).
 const sizes = {
   md: "min-h-[39px] rounded-md px-[13px] py-2 text-[13px]",
   sm: "min-h-8 rounded-md px-2.5 py-1 text-xs",
 } as const;
 
+// Thuộc tính của nút: như <button> thường + kiểu màu, cỡ, và `loading` (đang xử lý).
 export interface OgButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: OgVariant;
   size?: keyof typeof sizes;
   loading?: boolean;
 }
 
-/** Nút theo kiểu trang cũ. */
+/** Nút theo kiểu trang cũ; khi `loading` thì hiện vòng xoay và khóa nút. */
 export const OgButton = forwardRef<HTMLButtonElement, OgButtonProps>(function OgButton(
   { variant = "default", size = "md", loading, className, children, disabled, type = "button", ...rest },
   ref,
 ) {
   return (
+    // Nút bị khóa khi disabled hoặc đang loading; màu và cỡ ghép theo variant/size.
     <button
       ref={ref}
       type={type}
@@ -51,6 +57,7 @@ export const OgButton = forwardRef<HTMLButtonElement, OgButtonProps>(function Og
       )}
       {...rest}
     >
+      {/* Vòng xoay "đang xử lý" */}
       {loading ? <Loader2 size={size === "sm" ? 13 : 15} className="animate-spin" /> : null}
       {children}
     </button>
@@ -79,18 +86,21 @@ export const OgCard = forwardRef<HTMLElement, React.HTMLAttributes<HTMLElement>>
 export function OgCardTitle({ title, help, actions, className }: { title: React.ReactNode; help?: React.ReactNode; actions?: React.ReactNode; className?: string }) {
   return (
     <div className={cn("mb-4 flex flex-wrap items-start justify-between gap-x-3 gap-y-2.5 sm:mb-5", className)}>
+      {/* Bên trái: tiêu đề + dòng gợi ý xám */}
       <div className="min-w-0">
         <h2 className="text-lg leading-snug font-bold text-[#1e293b] sm:text-xl">{title}</h2>
         {help ? <div className="mt-1 text-xs leading-relaxed text-[#64748b]">{help}</div> : null}
       </div>
+      {/* Bên phải: các nút (tự xuống dòng khi màn hình hẹp) */}
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
   );
 }
 
-/** Nhãn tròn (`.badge` cũ): xanh nhạt/navy; `off` = hồng/đỏ. */
+/** Nhãn tròn (`.badge` cũ): xanh nhạt/navy; `off` = hồng/đỏ; ok = xanh lá; warn = vàng; muted = xám. */
 export function OgPill({ tone = "default", className, children }: { tone?: "default" | "off" | "ok" | "warn" | "muted"; className?: string; children: React.ReactNode }) {
   return (
+    // Chỉ màu ứng với `tone` được áp dụng.
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full px-2 py-[5px] text-xs leading-none whitespace-nowrap",
@@ -115,6 +125,7 @@ export const ogInput =
 /** Khung bảng: cuộn ngang/dọc trong khung (không làm tràn trang), header dính. */
 export function OgTable({ className, maxHeight, minWidth, children }: { className?: string; maxHeight?: string; minWidth?: number; children: React.ReactNode }) {
   return (
+    // Khung có thanh cuộn; maxHeight giới hạn chiều cao, minWidth giữ bảng không bị bóp hẹp.
     <div className={cn("w-full min-w-0 overflow-auto rounded-lg border border-[#e2e8f0]", className)} style={maxHeight ? { maxHeight } : undefined}>
       <table className="w-full border-separate border-spacing-0 text-sm" style={minWidth ? { minWidth } : undefined}>
         {children}
@@ -123,6 +134,7 @@ export function OgTable({ className, maxHeight, minWidth, children }: { classNam
   );
 }
 
+/** Ô tiêu đề cột: chữ đậm, dính trên cùng khi cuộn bảng. */
 export function OgTh({ className, children, ...rest }: React.ThHTMLAttributes<HTMLTableCellElement>) {
   return (
     <th
@@ -137,6 +149,7 @@ export function OgTh({ className, children, ...rest }: React.ThHTMLAttributes<HT
   );
 }
 
+/** Ô dữ liệu của bảng (có kẻ mờ phía dưới). */
 export function OgTd({ className, children, ...rest }: React.TdHTMLAttributes<HTMLTableCellElement>) {
   return (
     <td className={cn("border-b border-[#edf0f4] px-[11px] py-3 align-middle text-[#1e293b] first:pl-4 last:pr-4", className)} {...rest}>
@@ -145,6 +158,7 @@ export function OgTd({ className, children, ...rest }: React.TdHTMLAttributes<HT
   );
 }
 
+/** Một dòng của bảng (sáng nền khi rê chuột). */
 export function OgTr({ className, children, ...rest }: React.HTMLAttributes<HTMLTableRowElement>) {
   return (
     <tr className={cn("transition-colors hover:bg-[#f8fafc] [&:last-child>td]:border-b-0", className)} {...rest}>
@@ -153,7 +167,7 @@ export function OgTr({ className, children, ...rest }: React.HTMLAttributes<HTML
   );
 }
 
-/** Dòng trạng thái trống/đang tải/lỗi trong bảng. */
+/** Dòng trạng thái trống/đang tải/lỗi trong bảng (trải hết `colSpan` cột; lỗi thì chữ đỏ). */
 export function OgEmptyRow({ colSpan, children, tone }: { colSpan: number; children: React.ReactNode; tone?: "error" }) {
   return (
     <tr>

@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: lưu "ai đang đăng nhập" + hàm kiểm tra quyền, chia sẻ cho cả app qua Context (kho dữ liệu chung).
+ * Dùng ở: AppShell bọc <AuthProvider>; component nào cần thì gọi useAuth().
+ */
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
@@ -19,6 +23,7 @@ export interface Me {
   orderPermissions: string[];
 }
 
+/** Những gì useAuth() trả về. */
 interface AuthState {
   me: Me | null;
   loading: boolean;
@@ -31,12 +36,16 @@ interface AuthState {
   canOrder: (perm: string) => boolean;
 }
 
+// Kho dữ liệu chung về đăng nhập.
 const AuthContext = createContext<AuthState | null>(null);
 
+/** Tải người dùng hiện tại và cung cấp cho mọi component bên trong. */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  // Người dùng (null = chưa đăng nhập) và cờ đang tải.
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Tải lại người dùng từ máy chủ (vd sau khi đổi ảnh đại diện).
   const refresh = useCallback(async () => {
     try {
       setMe(await api.get<Me>("/api/me"));
@@ -47,6 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Khi app mở: hỏi máy chủ ai đang đăng nhập (bỏ qua kết quả nếu đã rời trang).
   useEffect(() => {
     let alive = true;
     api
@@ -59,6 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Đăng xuất rồi về trang /login.
   const logout = useCallback(async () => {
     await api.post("/api/logout").catch(() => undefined);
     // Tải lại toàn trang để xóa mọi state của phiên cũ.
@@ -66,6 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.href = "/login";
   }, []);
 
+  // Gói dữ liệu + hàm quyền (admin/super luôn có mọi quyền).
   const value = useMemo<AuthState>(() => {
     const isAdmin = !!me && (me.isSuper || me.role === "admin");
     return {
@@ -82,6 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+/** Lấy thông tin đăng nhập/quyền ở bất kỳ component nào. */
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth phải nằm trong <AuthProvider>");

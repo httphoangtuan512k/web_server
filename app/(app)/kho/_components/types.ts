@@ -1,6 +1,12 @@
+/**
+ * File này: mô tả dạng dữ liệu kho nhận từ máy chủ + vài hàm nhỏ (ngày, số).
+ * Dùng ở: mọi file trong kho/_components. Không tự hiện gì trên màn hình.
+ */
 /** Kiểu dữ liệu JSON của /api/warehouse* (giữ khóa snake_case như server cũ). */
 
+// 3 loại kho: Hàng hóa / Bao bì / Vật tư.
 export type ItemCategory = "goods" | "packaging" | "materials";
+// Nhập kho (in) hoặc xuất kho (out).
 export type StockAction = "in" | "out";
 
 /** Một mặt hàng (hàng hóa / bao bì / vật tư). Các cột không dùng của loại khác có thể vắng. */
@@ -19,6 +25,7 @@ export interface WarehouseItem {
   updated_at?: string;
 }
 
+// Một dòng lịch sử nhập/xuất: ai, mặt hàng nào, bao nhiêu, lúc nào.
 export interface WarehouseTransaction {
   id: number;
   category: ItemCategory | string;
@@ -31,6 +38,7 @@ export interface WarehouseTransaction {
   created_at: string;
 }
 
+// Một ngày đã chốt sổ (ai chốt, lúc nào).
 export interface ClosingDate {
   work_date: string;
   created_by: string;
@@ -39,9 +47,11 @@ export interface ClosingDate {
 
 /** GET /api/warehouse */
 export interface WarehouseData {
+  // Quyền của người đang đăng nhập.
   isAdmin: boolean;
   canEdit: boolean;
   isSuper: boolean;
+  // Danh sách mặt hàng của 3 loại kho.
   goods: WarehouseItem[];
   packaging: WarehouseItem[];
   materials: WarehouseItem[];
@@ -64,6 +74,7 @@ export interface DailySuggestion {
   machine_names?: string;
 }
 
+// Một dòng sản lượng của ngày: đơn gợi ý + số liệu trong ngày.
 export interface DailyRow extends DailySuggestion {
   produced_today: number;
   machine_totals?: Record<string, number>;
@@ -72,6 +83,7 @@ export interface DailyRow extends DailySuggestion {
   remaining: number;
 }
 
+// Sản lượng của một máy trong một phiếu.
 export interface EntryLine {
   machine_name: string;
   quantity: number;
@@ -86,6 +98,7 @@ export interface DailyEntry {
   machines: EntryLine[];
 }
 
+// Các phiếu nhập trong ngày của cùng một đơn.
 export interface DailyEntryGroup {
   order_key: string;
   repack: number;
@@ -96,6 +109,7 @@ export interface DailyEntryGroup {
 /** GET /api/warehouse/daily?date=YYYY-MM-DD */
 export interface DailyResponse {
   date: string;
+  // Ngày đã chốt chưa; ai chốt, lúc nào, bản thứ mấy.
   closed: boolean;
   createdBy?: string;
   closedAt?: string;
@@ -113,11 +127,13 @@ export interface SnapshotRow {
   created_at: string;
 }
 
+// Cặp "tên máy – số lượng" gửi lên máy chủ.
 export interface MachineQty {
   machineName: string;
   quantity: number;
 }
 
+// Chữ tiếng Việt hiện trên màn hình cho từng loại kho.
 export const CATEGORY_LABEL: Record<ItemCategory, string> = {
   goods: "Hàng hóa",
   packaging: "Bao bì",
@@ -125,13 +141,17 @@ export const CATEGORY_LABEL: Record<ItemCategory, string> = {
 };
 
 /** Nhãn một mặt hàng trong ô chọn (giống trang cũ). */
+// Ví dụ: "Kệ 3 · Dầu máy — tồn 12 lít".
 export function itemOptionLabel(cat: ItemCategory, x: WarehouseItem) {
+  // Vật tư: "kệ · tên"; loại khác: "tên · Lô …".
   const base = cat === "materials" ? `${x.shelf_number || "—"} · ${x.name}` : `${x.name}${x.lot_number ? ` · Lô ${x.lot_number}` : ""}`;
+  // Thêm "— tồn <số> <đơn vị>" (số kiểu Việt Nam).
   return `${base} — tồn ${Number(x.quantity || 0).toLocaleString("vi-VN", { maximumFractionDigits: 2 })} ${x.unit || ""}`.trim();
 }
 
 /** Cộng/trừ ngày trên chuỗi 'YYYY-MM-DD' (không phụ thuộc múi giờ máy). */
 export function shiftDate(key: string, days: number) {
+  // Tách năm/tháng/ngày, cộng ngày, đổi lại thành chuỗi.
   const [y, m, d] = key.split("-").map(Number);
   const t = new Date(Date.UTC(y, m - 1, d + days));
   return t.toISOString().slice(0, 10);
@@ -143,6 +163,7 @@ export function fmtDateKey(key: string) {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : key || "—";
 }
 
+// Đổi giá trị bất kỳ thành số; không hợp lệ thì trả 0.
 export const num = (v: unknown) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;

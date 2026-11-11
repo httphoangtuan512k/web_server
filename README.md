@@ -2,6 +2,9 @@
 
 Phần mềm nội bộ cho nhà máy bột đá **SUPER WHITE – Calcium Carbonate**: kế hoạch đơn hàng, vận hành máy nghiền, giám sát PLC, kho, bảo trì và tài liệu dùng chung.
 
+> **Người mới?** Đọc trước: [Hướng dẫn đọc code](docs/HUONG_DAN_DOC_CODE.md) · [Git cho người mới (pull / add / commit / push)](docs/git/README.md).
+> Mọi file code đều có chú thích tiếng Việt giải thích từng phần.
+
 **Một ứng dụng duy nhất**: giao diện Next.js và API NestJS chạy chung một tiến trình, một link. Mọi request `/api/*` được `pages/api/[...path].ts` chuyển thẳng vào NestJS.
 
 | Thư mục | Nội dung |

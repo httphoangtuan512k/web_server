@@ -1,3 +1,7 @@
+/**
+ * File này: danh sách thẻ chức năng trên trang chủ + quy tắc ai được thấy thẻ nào.
+ * Dùng ở: trang chủ (home-parts/dashboard.tsx).
+ */
 import type { Me } from "./auth";
 
 /** Thẻ chức năng trên trang chủ (giống trang chủ cũ). */
@@ -11,9 +15,11 @@ export interface NavItem {
   page?: string;
   /** 'admin' = admin hoặc super; 'super' = chỉ super. */
   role?: "admin" | "super";
+  // "main" = chức năng sản xuất, "admin" = quản trị.
   group: "main" | "admin";
 }
 
+// Các thẻ theo đúng thứ tự hiện trên trang chủ.
 export const NAV: NavItem[] = [
   { href: "/ke-hoach", label: "Kế hoạch đơn hàng", description: "Quản lý đơn hàng, sản lượng và tiến độ sản xuất.", icon: "▤", page: "kehoach", group: "main" },
   { href: "/van-hanh", label: "Thông tin vận hành máy", description: "Theo dõi trạng thái máy và thông số vận hành.", icon: "◉", page: "vanhanh", group: "main" },
@@ -28,6 +34,7 @@ export const NAV: NavItem[] = [
   { href: "/quan-tri/du-lieu", label: "Dữ liệu gốc", description: "Xem và chỉnh sửa trực tiếp các bảng dữ liệu.", icon: "🗄", role: "super", group: "admin" },
 ];
 
+/** Người dùng có được thấy thẻ này không (admin thấy mọi thẻ không phải "super"). */
 export function canSee(item: NavItem, me: Me | null) {
   if (!me) return false;
   const isAdmin = me.isSuper || me.role === "admin";

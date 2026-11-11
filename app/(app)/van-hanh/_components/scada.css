@@ -1,20 +1,21 @@
 /*
- * Sơ đồ SCADA máy nghiền – ảnh gốc (1019×570) + lớp số liệu đặt đè ĐÚNG toạ độ của vanhanh.html cũ
- * (.scada-reference-* / .scada-*). Mọi vị trí theo % khung ảnh, kích thước/chữ theo cqw (1cqw = 1% bề rộng sơ đồ)
- * nên ô số luôn nằm đúng chỗ trên ảnh ở mọi màn hình. clamp() chỉ giữ chữ đủ đọc trên điện thoại.
- * Lưu ý: dự án biên dịch mọi *.css thành CSS toàn cục (kể cả *.module.css) nên tên lớp có tiền tố scd-.
- * Mốc tham chiếu: sơ đồ rộng 700px trên máy tính như bản gốc.
+ * File này: kiểu dáng sơ đồ SCADA – ảnh gốc 1019×570 + ô số đặt đè ĐÚNG toạ độ vanhanh.html cũ.
+ * Vị trí theo % khung ảnh, cỡ chữ/ô theo cqw (1% bề rộng sơ đồ) nên luôn khớp ảnh ở mọi màn hình;
+ * clamp() giữ chữ đủ đọc trên điện thoại. Tên lớp có tiền tố scd- vì CSS ở đây là toàn cục.
  */
 
+/* Khung sơ đồ: giữ đúng tỉ lệ ảnh 1019:570; cqw tính theo bề rộng khung này. */
 .scd-wrap {
   position: relative;
   width: 100%;
   aspect-ratio: 1019 / 570;
+  /* 1cqw = 1% bề rộng khung → chữ/ô co giãn cùng sơ đồ. */
   container-type: inline-size;
   /* chừa chỗ cho ô hệ số nằm sát mép dưới (top 98%) */
   margin-bottom: 12px;
 }
 
+/* Ảnh, lớp SVG và lớp ô số chồng khít lên nhau, phủ kín khung. */
 .scd-img,
 .scd-svg,
 .scd-overlay {
@@ -24,6 +25,7 @@
   height: 100%;
 }
 
+/* Ảnh nền sơ đồ: không cho chọn/kéo. */
 .scd-img {
   display: block;
   object-fit: fill;
@@ -31,11 +33,13 @@
   -webkit-user-drag: none;
 }
 
+/* Lớp SVG chỉ để vẽ, không nhận bấm chuột. */
 .scd-svg {
   pointer-events: none;
   overflow: visible;
 }
 
+/* Lớp chứa các ô số; chỉ ô nào bật pointer-events mới bấm được. */
 .scd-overlay {
   pointer-events: none;
   font-family: Arial, Helvetica, sans-serif;
@@ -45,6 +49,7 @@
 /* ---------- Ô chung: tâm ô đặt tại (left, top) ---------- */
 .scd-box {
   position: absolute;
+  /* left/top (%) là TÂM ô: lùi lại nửa rộng, nửa cao. */
   transform: translate(-50%, -50%);
   box-sizing: border-box;
   text-align: center;
@@ -71,6 +76,7 @@
   border-radius: 2px;
   cursor: text;
 }
+/* Rê chuột / đang gõ / bị khóa / vừa lưu (nền xanh nhạt). */
 .scd-bare-input:hover:not(:disabled) {
   background: rgb(255 255 255 / 0.7);
   box-shadow: 0 0 0 1px #cbd5e1;
@@ -106,6 +112,7 @@
   font-size: clamp(7.5px, 1.7cqw, 16px);
   line-height: 1;
 }
+/* Ô nhập bên trong ô mức đầy: chữ xanh lá. */
 .scd-hopper-setpoint .scd-bare-input {
   height: 100%;
   font-weight: 700;
@@ -124,6 +131,7 @@
   line-height: 1.05;
   color: #111827;
 }
+/* Nhãn nhỏ in hoa dưới số ("TẤN", "TỒN A · TẤN"). */
 .scd-stock small {
   display: block;
   margin-top: 0.23cqw;
@@ -134,6 +142,7 @@
   text-transform: uppercase;
   white-space: nowrap;
 }
+/* Vị trí ô tồn phễu (trái trên). */
 .scd-hopper-stock {
   left: 8.15%;
   top: 23%;
@@ -141,6 +150,7 @@
   min-width: 30px;
   min-height: 7.4cqw;
 }
+/* Ô tồn silo A ở 68,5% ngang, silo B ở 91,7%, cùng cao 58%. */
 .scd-stock-a,
 .scd-stock-b {
   top: 58%;
@@ -166,12 +176,14 @@
   color: #111827;
   line-height: 1.05;
 }
+/* Số bộ đếm. */
 .scd-counter span {
   display: block;
   font-size: clamp(7.5px, 1.93cqw, 18px);
   font-weight: 700;
   white-space: nowrap;
 }
+/* Nhãn JB / ĐÓNG BAO nằm ngay dưới khung bộ đếm. */
 .scd-counter small {
   position: absolute;
   left: 50%;
@@ -183,6 +195,7 @@
   font-weight: 500;
   white-space: nowrap;
 }
+/* Bộ đếm A dưới silo A, B dưới silo B. */
 .scd-counter-a {
   left: 68.5%;
 }
@@ -202,6 +215,7 @@
   color: #334155;
   white-space: nowrap;
 }
+/* Ô nhập hệ số + các trạng thái focus / khóa / vừa lưu. */
 .scd-coeff input {
   width: 6cqw;
   min-width: 26px;
@@ -228,6 +242,7 @@
 .scd-coeff input[data-saved] {
   background: #dcfce7;
 }
+/* Hệ số A dưới silo A, B dưới silo B. */
 .scd-coeff-a {
   left: 68.5%;
 }
@@ -242,6 +257,7 @@
     fill 0.2s,
     stroke 0.2s;
 }
+/* Đèn: xám = chưa rõ, trắng viền xanh = tắt, đỏ = có liệu. */
 .scd-dot-unknown {
   fill: #94a3b8;
   stroke: #64748b;
@@ -255,6 +271,7 @@
   stroke: #991b1b;
 }
 
+/* Chữ số sản lượng trong ô viền xanh. */
 .scd-production {
   font:
     700 16px Arial,
@@ -264,6 +281,7 @@
   text-anchor: middle;
 }
 
+/* Đường xoắn vàng cấp liệu: ẩn, chỉ hiện + chạy khi đang cấp. */
 .scd-spiral {
   opacity: 0;
   fill: none;
@@ -282,6 +300,7 @@
   }
 }
 
+/* Trục máy nghiền: chỉ hiện + quay khi máy chạy. */
 .scd-cylinder {
   opacity: 0;
   transition: opacity 0.2s;
@@ -301,6 +320,7 @@
   }
 }
 
+/* Người dùng tắt hiệu ứng chuyển động → dừng mọi animation. */
 @media (prefers-reduced-motion: reduce) {
   .scd-spiral-active,
   .scd-ribs {

@@ -1,6 +1,6 @@
 /**
- * Kiểu dữ liệu PLC – đúng JSON của server cũ (`/api/plc/*`, web/server.js).
- * Dùng chung cho /van-hanh và /plc.
+ * File này: mô tả hình dạng dữ liệu PLC – đúng JSON của server cũ (`/api/plc/*`, web/server.js).
+ * Dùng ở: trang /van-hanh (sơ đồ SCADA) và /plc; không vẽ gì lên màn hình.
  */
 
 /** Mã máy trong payload PLC (C# gửi đủ 4 nhóm). */
@@ -16,12 +16,13 @@ export type PlcMachineData = Record<string, PlcValue>;
 export interface PlcPayload {
   device_id: string;
   source_timestamp: string;
+  // Dữ liệu từng máy may1…may4 (có thể thiếu máy).
   machines: Partial<Record<PlcMachineId, PlcMachineData>> & Record<string, PlcMachineData | undefined>;
 }
 
 /**
  * Trạng thái vận hành do server tính (plc_operation_state / plc_machine_states).
- * Đơn vị: tấn (hopper, stock*), hệ số không đơn vị, counter = raw × hệ số.
+ * Đơn vị: tấn (hopper = phễu, stock* = tồn silo), hệ số không đơn vị, counter = raw × hệ số.
  */
 export interface PlcOperationState {
   hopperSetpoint: number;
@@ -30,6 +31,7 @@ export interface PlcOperationState {
   stockB: number;
   coeffA: number;
   coeffB: number;
+  // Giá trị lần đọc trước – server dùng để tính chênh lệch.
   lastWeight?: number | null;
   lastRawCounterA?: number | null;
   lastRawCounterB?: number | null;
