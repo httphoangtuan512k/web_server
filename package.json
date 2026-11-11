@@ -1,0 +1,14 @@
+{
+  "name": "superwhite",
+  "private": true,
+  "description": "SUPER WHITE – hệ thống quản lý sản xuất (apps/api + apps/web)",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "setup": "npm ci --prefix apps/api && npm ci --prefix apps/web",
+    "dev": "node scripts/dev.mjs",
+    "build": "npm run build --prefix apps/api && npm run build --prefix apps/web",
+    "typecheck": "npm run typecheck --prefix apps/api && cd apps/web && npx tsc --noEmit",
+    "db:migrate": "npm run db:migrate --prefix apps/api",
+    "db:studio": "npm run db:studio --prefix apps/api"
+  }
+}

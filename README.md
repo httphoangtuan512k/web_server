@@ -12,23 +12,27 @@ Trình duyệt chỉ làm việc với `apps/web`; mọi request `/api/*` đư�
 
 ## Chạy local
 
-Yêu cầu: Node.js ≥ 20, Postgres local (hoặc dùng Neon).
+Yêu cầu: Node.js ≥ 20, Postgres (local hoặc Neon).
 
 ```bash
-# 1. API
-cd apps/api
-cp .env.example .env          # điền DATABASE_URL, BLOB_READ_WRITE_TOKEN, SESSION_SECRET, CRON_SECRET
-npm ci
-npm run db:migrate            # tạo/cập nhật bảng
-npm run create-super-admin -- <username> <mật-khẩu-≥10-ký-tự> "Họ tên"
-npm run dev                   # http://localhost:4000
+# Lần đầu
+cp apps/api/.env.example apps/api/.env      # điền DATABASE_URL, BLOB_READ_WRITE_TOKEN, SESSION_SECRET, CRON_SECRET
+npm run setup                               # cài thư viện cho cả api + web
+npm run db:migrate                          # tạo/cập nhật bảng
+npm run create-super-admin --prefix apps/api -- <username> <mật-khẩu-≥10-ký-tự> "Họ tên"
 
-# 2. Web (terminal khác)
-cd apps/web
-cp .env.example .env.local    # API_URL=http://localhost:4000
-npm ci
-npm run dev                   # http://localhost:3000
+# Hằng ngày: chạy cả API + Web bằng 1 lệnh
+npm run dev                                 # mở http://localhost:3000  (API chạy ngầm ở :4000)
 ```
+
+Đổi cổng: `WEB_PORT=3001 API_PORT=4001 npm run dev`. Ctrl+C dừng cả hai.
+
+| Lệnh (ở thư mục gốc) | Tác dụng |
+|---|---|
+| `npm run dev` | Chạy API + Web, log gộp có nhãn `[api]`/`[web]` |
+| `npm run build` | Build cả hai |
+| `npm run typecheck` | Kiểm tra kiểu TypeScript cả hai |
+| `npm run db:migrate` / `npm run db:studio` | Migration / xem dữ liệu |
 
 ## Cơ sở dữ liệu
 
