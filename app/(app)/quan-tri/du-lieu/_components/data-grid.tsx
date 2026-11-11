@@ -1,86 +1,76 @@
 "use client";
 
-import { KeyRound, Pencil, Trash2 } from "lucide-react";
 import { useMemo } from "react";
 import { cn } from "@/lib/cn";
-import { Table, Td, Th, THead } from "@/components/ui/table";
+import { OgButton } from "../../_shared/og-button";
 import { displayValue, isImageValue, kindOf, labelOf, rawText } from "./columns";
 import type { SuperRow, SuperTableData } from "./types";
 
-/** Bảng dữ liệu thô: cuộn ngang/dọc, cột thao tác cố định bên trái, nhấp đúp ô để sửa. */
+/**
+ * Bảng dữ liệu thô như superdata.html: cuộn ngang/dọc trong khung, header dính,
+ * cột "Thao tác" (Sửa / Xóa) ở cuối và dính bên phải; nhấp đúp ô để sửa.
+ */
 export function DataGrid({ data, onEdit, onDelete }: { data: SuperTableData; onEdit: (row: SuperRow) => void; onDelete: (row: SuperRow) => void }) {
   const pk = useMemo(() => new Set(data.primaryKey), [data.primaryKey]);
   const kinds = useMemo(() => Object.fromEntries(data.columns.map((c) => [c.name, kindOf(c, data.rows[0]?.values[c.name])])), [data.columns, data.rows]);
 
+  const th = "sticky top-0 z-[2] border-b border-[#edf0f4] bg-[#f7f9fc] px-3 py-2.5 text-left text-[13px] font-bold whitespace-nowrap text-[#475569]";
   return (
-    <Table maxHeight="calc(100dvh - 300px)" className="min-h-[240px]">
-      <THead>
-        <tr>
-          <Th className="sticky left-0 z-[2] w-[84px] bg-surface-2">Thao tác</Th>
-          {data.columns.map((c) => (
-            <Th key={c.name} title={`${c.name} · ${c.type || "?"}${c.notnull ? " · NOT NULL" : ""}`} className="min-w-[110px] normal-case">
-              <span className="inline-flex items-center gap-1">
-                {pk.has(c.name) ? <KeyRound size={11} className="text-brand-600" /> : null}
-                <span className="tracking-normal">{labelOf(c.name)}</span>
-              </span>
-              <span className="block font-mono text-[10px] font-normal tracking-normal text-subtle">{c.name}</span>
-            </Th>
-          ))}
-        </tr>
-      </THead>
-      <tbody>
-        {data.rows.map((r, i) => (
-          <tr key={JSON.stringify(r.key) || i} className="group [&:last-child>td]:border-b-0">
-            <Td className="sticky left-0 bg-surface py-1.5! group-hover:bg-surface-2">
-              <div className="flex gap-0.5">
-                <button
-                  type="button"
-                  onClick={() => onEdit(r)}
-                  title="Sửa bản ghi"
-                  aria-label="Sửa bản ghi"
-                  className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-brand-50 hover:text-brand-600"
-                >
-                  <Pencil size={15} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDelete(r)}
-                  title="Xóa bản ghi"
-                  aria-label="Xóa bản ghi"
-                  className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-danger-50 hover:text-danger-600"
-                >
-                  <Trash2 size={15} />
-                </button>
-              </div>
-            </Td>
-            {data.columns.map((c) => {
-              const v = r.values[c.name];
-              const kind = kinds[c.name];
-              const text = displayValue(c.name, v, kind);
-              return (
-                <Td
-                  key={c.name}
-                  title={`${rawText(v).slice(0, 500)}\nNhấp đúp để sửa`}
-                  onDoubleClick={() => onEdit(r)}
-                  className={cn(
-                    "max-w-[260px] cursor-pointer truncate text-[13px] whitespace-nowrap group-hover:bg-surface-2 hover:bg-brand-50!",
-                    (v === null || v === undefined || v === "") && "text-subtle",
-                    kind === "number" && "num text-right",
-                    pk.has(c.name) && "font-medium",
-                  )}
-                >
-                  {isImageValue(v) && !v.startsWith("data:") ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={v} alt="" className="h-8 w-8 rounded border border-line object-cover" loading="lazy" />
-                  ) : (
-                    text
-                  )}
-                </Td>
-              );
-            })}
+    <div className="max-h-[calc(100dvh-300px)] min-h-[240px] w-full min-w-0 overflow-auto rounded-[9px] border border-[#e5eaf1]">
+      <table className="w-max min-w-full border-separate border-spacing-0 text-[13px]">
+        <thead>
+          <tr>
+            {data.columns.map((c) => (
+              <th key={c.name} title={`${c.name} · ${c.type || "?"}${c.notnull ? " · NOT NULL" : ""}${pk.has(c.name) ? " · Khóa chính" : ""}`} className={cn(th, "min-w-[105px]")}>
+                {labelOf(c.name)}
+              </th>
+            ))}
+            <th className={cn(th, "right-0 z-[3] shadow-[-6px_0_8px_-6px_rgba(15,23,42,0.15)]")}>Thao tác</th>
           </tr>
-        ))}
-      </tbody>
-    </Table>
+        </thead>
+        <tbody>
+          {data.rows.map((r, i) => (
+            <tr key={JSON.stringify(r.key) || i} className="group [&:last-child>td]:border-b-0">
+              {data.columns.map((c) => {
+                const v = r.values[c.name];
+                const kind = kinds[c.name];
+                const text = displayValue(c.name, v, kind);
+                return (
+                  <td
+                    key={c.name}
+                    title={`${rawText(v).slice(0, 500)}\nNhấp đúp để sửa`}
+                    onDoubleClick={() => onEdit(r)}
+                    className={cn(
+                      "max-w-[260px] cursor-pointer truncate border-b border-[#edf0f4] bg-white px-3 py-2.5 align-top whitespace-nowrap text-[#172033]",
+                      "group-hover:bg-[#fbfcff] hover:bg-[#eaf1ff]! hover:outline hover:-outline-offset-1 hover:outline-[#9bb8f0] active:bg-[#dce8ff]!",
+                      (v === null || v === undefined || v === "") && "text-[#94a3b8]",
+                      kind === "number" && "num",
+                      pk.has(c.name) && "font-semibold",
+                    )}
+                  >
+                    {isImageValue(v) && !v.startsWith("data:") ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={v} alt="" className="h-8 w-8 rounded border border-[#e5eaf1] object-cover" loading="lazy" />
+                    ) : (
+                      text
+                    )}
+                  </td>
+                );
+              })}
+              <td className="sticky right-0 z-[1] border-b border-[#edf0f4] bg-white px-3 py-2 whitespace-nowrap shadow-[-6px_0_8px_-6px_rgba(15,23,42,0.15)] group-hover:bg-[#fbfcff]">
+                <div className="flex gap-1.5">
+                  <OgButton variant="blue" size="sm" onClick={() => onEdit(r)} title="Sửa bản ghi">
+                    Sửa
+                  </OgButton>
+                  <OgButton variant="red" size="sm" onClick={() => onDelete(r)} title="Xóa bản ghi">
+                    Xóa
+                  </OgButton>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

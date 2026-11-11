@@ -1,12 +1,11 @@
 "use client";
 
-import { Save } from "lucide-react";
 import { useState } from "react";
 import { api, errorMessage } from "@/lib/api";
-import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
+import { OgButton } from "../../_shared/og-button";
 import { fromVnInputValue, toVnInputValue } from "../../_shared/utils";
 import type { HistoryPatch, HistoryRow } from "./types";
 
@@ -73,12 +72,12 @@ export function HistoryEditModal({ row, onClose, onSaved }: { row: HistoryRow; o
       description="Thay đổi được ghi vào nhật ký quản trị (EDIT_HISTORY)."
       footer={
         <>
-          <Button variant="secondary" onClick={onClose} disabled={saving}>
+          <OgButton onClick={onClose} disabled={saving}>
             Hủy
-          </Button>
-          <Button type="submit" form="history-edit-form" icon={Save} loading={saving}>
+          </OgButton>
+          <OgButton type="submit" form="history-edit-form" variant="primary" loading={saving}>
             Lưu thay đổi
-          </Button>
+          </OgButton>
         </>
       }
     >

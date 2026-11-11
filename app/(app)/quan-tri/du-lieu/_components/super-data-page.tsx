@@ -1,26 +1,28 @@
 "use client";
 
-import { Database, RefreshCw, SearchX, Table2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { Button } from "@/components/ui/button";
-import { Badge, Card, EmptyState, PageHeader, Spinner } from "@/components/ui/card";
-import { SearchInput, Select } from "@/components/ui/form";
 import { useConfirm } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { PageGuard } from "@/components/shell/page-guard";
-import { Callout } from "../../_shared/callout";
+import { PageBody, PageTopbar } from "@/components/shell/page-topbar";
+import { OgButton, OgEmptyBox, OgScreen, topbarStack } from "../../_shared/og-button";
 import { useApiData } from "../../_shared/use-api-data";
 import { DataGrid } from "./data-grid";
 import { RowEditorModal } from "./row-editor-modal";
 import type { SuperRow, SuperTable, SuperTableData } from "./types";
 
+/** Thẻ trắng theo superdata.html (viền #e5eaf1, bo 13px). */
+const card = "min-w-0 rounded-[13px] border border-[#e5eaf1] bg-white p-4 shadow-[0_3px_12px_rgba(11,27,53,0.03)]";
+
 export function SuperDataPage() {
   return (
-    <PageGuard role="super">
-      <SuperDataContent />
-    </PageGuard>
+    <OgScreen>
+      <PageGuard role="super">
+        <SuperDataContent />
+      </PageGuard>
+    </OgScreen>
   );
 }
 
@@ -54,7 +56,7 @@ function SuperDataContent() {
   async function remove(row: SuperRow) {
     if (!current) return;
     const ok = await confirm({
-      title: `Xóa bản ghi khỏi “${current.label}”?`,
+      title: `Xóa bản ghi này khỏi “${current.label}”?`,
       message: (
         <>
           <p>Thao tác có thể ảnh hưởng dữ liệu liên quan và không có chức năng hoàn tác.</p>
@@ -76,104 +78,106 @@ function SuperDataContent() {
 
   return (
     <>
-      <PageHeader title="Dữ liệu gốc" description="Xem và chỉnh sửa trực tiếp các bảng dữ liệu nghiệp vụ. Chỉ Super Admin truy cập được." />
-      <Callout tone="danger" title="Bạn đang chỉnh trực tiếp dữ liệu gốc" className="mb-5">
-        Sửa hoặc xóa tại đây tác động ngay đến dữ liệu đang sử dụng, bỏ qua mọi kiểm tra nghiệp vụ và không ghi lịch sử. Mật khẩu, khóa phiên và cờ Super Admin được
-        bảo vệ, không hiển thị trong trình xem này.
-      </Callout>
+      <PageTopbar
+        className={topbarStack}
+        title={
+          <>
+            SUPER WHITE <span className="font-medium text-white/65">/ QUẢN TRỊ DỮ LIỆU</span>
+          </>
+        }
+        subtitle="Chỉnh sửa trực tiếp dữ liệu nghiệp vụ trong cơ sở dữ liệu"
+      />
 
-      <div className="grid gap-5 lg:grid-cols-[240px_minmax(0,1fr)]">
-        {/* Danh mục bảng */}
-        <aside className="min-w-0">
-          <div className="lg:hidden">
-            <Select value={table} onChange={(e) => setSelected(e.target.value)} aria-label="Chọn danh mục dữ liệu" disabled={!tables?.length}>
-              {!tables ? <option>Đang tải…</option> : null}
-              {tables?.map((t) => (
-                <option key={t.name} value={t.name}>
-                  {t.label}
-                </option>
-              ))}
-            </Select>
-          </div>
-          <Card className="hidden overflow-hidden lg:sticky lg:top-4 lg:block">
-            <p className="border-b border-line px-4 py-3 text-xs font-semibold tracking-wide text-muted uppercase">Danh mục dữ liệu</p>
+      <PageBody className="max-w-[1500px]! text-[#172033]">
+        <div className="mb-3.5 rounded-[9px] border border-[#f5dfac] bg-[#fff8e8] px-3 py-2.5 text-[13px] leading-relaxed text-[#805b16]">
+          Chỉ Super Admin truy cập được. Sửa hoặc xóa tại đây tác động trực tiếp đến dữ liệu đang sử dụng (không qua kiểm tra nghiệp vụ, không ghi lịch sử).
+          Mật khẩu và cờ định danh Super Admin được bảo vệ, không hiển thị trong bảng này.
+        </div>
+
+        <div className="grid gap-4 min-[850px]:grid-cols-[250px_minmax(0,1fr)]">
+          {/* Danh mục bảng */}
+          <aside className={cn(card, "min-[850px]:sticky min-[850px]:top-20 min-[850px]:self-start")}>
+            <h3 className="mb-3 text-lg font-bold">Danh mục dữ liệu</h3>
             {tablesQ.error && !tables ? (
-              <p className="px-4 py-6 text-sm text-danger-600">{tablesQ.error}</p>
+              <p className="py-4 text-sm text-[#b42318]">{tablesQ.error}</p>
             ) : !tables ? (
-              <Spinner />
+              <p className="py-4 text-sm text-[#64748b]">Đang tải...</p>
+            ) : !tables.length ? (
+              <p className="py-4 text-sm text-[#64748b]">Không có bảng nào được phép truy cập.</p>
             ) : (
-              <nav className="flex max-h-[calc(100dvh-220px)] flex-col gap-0.5 overflow-y-auto p-2">
+              <nav className="grid grid-cols-2 gap-1.5 min-[850px]:max-h-[calc(100dvh-240px)] min-[850px]:grid-cols-1 min-[850px]:overflow-y-auto">
                 {tables.map((t) => {
                   const active = t.name === table;
                   return (
                     <button
                       key={t.name}
                       type="button"
+                      title={t.name}
                       onClick={() => setSelected(t.name)}
                       aria-current={active ? "true" : undefined}
                       className={cn(
-                        "flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-[13px] transition-colors",
-                        active ? "bg-brand-50 font-semibold text-brand-700" : "text-muted hover:bg-surface-3 hover:text-fg",
+                        "min-w-0 truncate rounded-lg px-3 py-[11px] text-left text-[13px] transition-colors sm:text-sm",
+                        active ? "bg-[#e8efff] font-bold text-[#1746a2]" : "bg-[#f5f7fb] text-[#334155] hover:bg-[#edf1f8]",
                       )}
                     >
-                      <Table2 size={15} className={cn("shrink-0", active ? "text-brand-600" : "text-subtle")} />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate">{t.label}</span>
-                        <span className="block truncate font-mono text-[10.5px] font-normal text-subtle">{t.name}</span>
-                      </span>
+                      {t.label}
                     </button>
                   );
                 })}
               </nav>
             )}
-          </Card>
-        </aside>
+          </aside>
 
-        {/* Dữ liệu bảng */}
-        <Card className="min-w-0">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-line px-4 py-3.5 sm:px-5">
-            <div className="min-w-0">
-              <h2 className="text-[15px] font-semibold text-fg">{current?.label ?? tableLabel ?? "Chọn danh mục"}</h2>
-              <p className="mt-0.5 text-[13px] text-muted">
-                {current ? (
-                  <>
-                    Bảng <code className="font-mono text-xs text-fg">{current.table}</code> · Khóa chính{" "}
-                    <code className="font-mono text-xs text-fg">{current.primaryKey.join(", ")}</code> · {current.columns.length} cột
-                  </>
-                ) : (
-                  "Chọn một bảng để xem và chỉnh sửa bản ghi."
-                )}
-              </p>
-            </div>
-            {current ? (
-              <Badge tone={current.rows.length >= 200 ? "warning" : "neutral"}>
-                <span className="num">{current.rows.length}</span> bản ghi{current.rows.length >= 200 ? " (giới hạn)" : ""}
-              </Badge>
-            ) : null}
-          </div>
-          <div className="flex flex-col gap-2 border-b border-line px-4 py-3 sm:flex-row sm:items-center sm:px-5">
-            <SearchInput className="sm:max-w-md sm:flex-1" placeholder="Tìm trong dữ liệu đang chọn…" value={q} onChange={(e) => setQ(e.target.value)} />
-            <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={refresh} disabled={!url}>
-              Tải lại
-            </Button>
-            <p className="text-xs text-muted sm:ml-auto">Nhấp đúp vào ô để sửa · tối đa 200 bản ghi mỗi lần tải</p>
-          </div>
+          {/* Dữ liệu bảng */}
+          <section className={card}>
+            <h2 className="text-xl font-bold sm:text-2xl">{current?.label ?? tableLabel ?? "Chọn danh mục"}</h2>
+            <p className="mt-1.5 text-[13px] text-[#64748b]">
+              {current
+                ? `Bảng: ${current.table} · Khóa chính: ${current.primaryKey.join(", ")} · ${current.columns.length} cột`
+                : "Chọn một bảng ở bên trái để xem và chỉnh sửa bản ghi."}
+            </p>
 
-          {!table ? (
-            tables && !tables.length ? <EmptyState icon={Database} title="Không có bảng nào được phép truy cập" /> : <Spinner />
-          ) : error && !ready ? (
-            <EmptyState icon={SearchX} title="Không đọc được dữ liệu" description={error} action={<Button variant="secondary" icon={RefreshCw} onClick={refresh}>Thử lại</Button>} />
-          ) : !current ? (
-            <Spinner />
-          ) : !current.rows.length ? (
-            <EmptyState icon={SearchX} title="Không có dữ liệu phù hợp" description={query ? `Không tìm thấy “${query}”.` : "Bảng chưa có bản ghi nào."} />
-          ) : (
-            <div className={cn("transition-opacity", loading && "opacity-60")}>
-              <DataGrid data={current} onEdit={setEditing} onDelete={remove} />
+            <div className="my-3 flex flex-wrap items-center gap-2">
+              <input
+                type="search"
+                className="min-w-0 flex-1 rounded-lg border border-[#cbd5e1] bg-white px-[11px] py-2.5 text-sm placeholder:text-[#94a3b8] focus:border-[#9bb8f0] focus:ring-3 focus:ring-[#9bb8f0]/35 focus:outline-none sm:max-w-sm sm:min-w-[180px]"
+                placeholder="Tìm trong dữ liệu đang chọn..."
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+              <OgButton variant="soft" className="rounded-lg!" loading={loading} onClick={refresh} disabled={!url}>
+                Tải lại
+              </OgButton>
+              {current ? (
+                <span
+                  className={cn(
+                    "rounded-full px-2 py-[3px] text-[11px]",
+                    current.rows.length >= 200 ? "bg-[#fff7e6] text-[#92400e]" : "bg-[#eef2f7] text-[#475569]",
+                  )}
+                >
+                  {current.rows.length} bản ghi{current.rows.length >= 200 ? " (giới hạn)" : ""}
+                </span>
+              ) : null}
+              <span className="hidden text-xs text-[#64748b] md:ml-auto md:inline">Nhấp đúp vào ô để sửa</span>
             </div>
-          )}
-        </Card>
-      </div>
+
+            {!table ? (
+              <OgEmptyBox>{tables && !tables.length ? "Không có bảng nào được phép truy cập." : "Đang tải..."}</OgEmptyBox>
+            ) : error && !ready ? (
+              <OgEmptyBox tone="error">{error}</OgEmptyBox>
+            ) : !current ? (
+              <OgEmptyBox>Đang tải...</OgEmptyBox>
+            ) : !current.rows.length ? (
+              <OgEmptyBox>{query ? `Không có dữ liệu phù hợp với “${query}”.` : "Không có dữ liệu phù hợp."}</OgEmptyBox>
+            ) : (
+              <div className={cn("transition-opacity", loading && "opacity-60")}>
+                <DataGrid data={current} onEdit={setEditing} onDelete={remove} />
+              </div>
+            )}
+            <p className="mt-2.5 text-[13px] text-[#64748b]">Mỗi lần tải tối đa 200 bản ghi (có thể lọc theo từ khóa).</p>
+          </section>
+        </div>
+      </PageBody>
 
       {editing && current ? (
         <RowEditorModal key={JSON.stringify(editing.key)} data={current} row={editing} onClose={() => setEditing(null)} onSaved={refresh} />

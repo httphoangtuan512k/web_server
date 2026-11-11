@@ -1,15 +1,13 @@
 "use client";
 
-import { CalendarCheck2, ChevronDown, ExternalLink, RefreshCw } from "lucide-react";
+import { ChevronDown, RefreshCw } from "lucide-react";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { fmtDateTime, fmtNumber } from "@/lib/format";
-import { Button } from "@/components/ui/button";
-import { Badge, Card, CardHeader, EmptyState, Spinner } from "@/components/ui/card";
-import { SearchInput } from "@/components/ui/form";
-import { Table, THead, Td, Th, Tr } from "@/components/ui/table";
+import { Spinner } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
+import { KBtn, KCard, KEmptyRow, KPill, KTable, kInput, kTd, kTh, kTr } from "./kho-ui";
 import { fmtDateKey, num, type DailyResponse, type DailyRow, type SnapshotRow } from "./types";
 
 type Detail = { loading: boolean; rows: DailyRow[]; error?: string };
@@ -64,102 +62,108 @@ export function ClosingsTab({ onOpenDate }: { onOpenDate: (date: string) => void
     return rows.filter((x) => `${x.work_date} ${fmtDateKey(x.work_date)} ${x.created_by}`.toLowerCase().includes(k));
   }, [rows, q]);
 
+  const subTh = "border-b border-[#e3eaf2] bg-[#f2f6fa] px-2.5 py-2 text-xs font-bold whitespace-nowrap text-[#294766]";
+  const subTd = cn(kTd, "py-2 text-right font-semibold tabular-nums");
+
   return (
-    <Card>
-      <CardHeader
-        icon={CalendarCheck2}
-        title="Lịch sử các lần chốt ngày"
-        description="Mỗi ngày hiển thị bản chốt mới nhất. Bấm vào một dòng để xem số liệu theo đơn hàng."
-        actions={
-          <>
-            <SearchInput placeholder="Tìm theo ngày / người chốt" value={q} onChange={(e) => setQ(e.target.value)} className="w-full sm:w-64" />
-            <Button variant="secondary" size="icon" icon={RefreshCw} aria-label="Tải lại" onClick={refresh} />
-          </>
-        }
-      />
-      {!rows ? (
-        error ? (
-          <p className="px-5 py-8 text-center text-sm text-danger-600">{error}</p>
-        ) : (
-          <Spinner />
-        )
-      ) : !filtered.length ? (
-        <EmptyState icon={CalendarCheck2} title={rows.length ? "Không có bản chốt phù hợp." : "Chưa có bản chốt."} />
-      ) : (
-        <Table>
-          <THead>
-            <tr>
-              <Th className="w-8" />
-              <Th>Ngày</Th>
-              <Th>Lần chốt</Th>
-              <Th>Người chốt</Th>
-              <Th>Thời gian</Th>
-              <Th align="right">Thao tác</Th>
-            </tr>
-          </THead>
-          <tbody>
-            {filtered.map((x) => {
+    <KCard
+      title="Lịch sử các lần chốt ngày"
+      description="Mỗi ngày hiển thị bản chốt mới nhất. Bấm vào một dòng để xem số liệu theo đơn hàng."
+      actions={
+        <>
+          <input
+            type="search"
+            placeholder="Tìm theo ngày / người chốt"
+            aria-label="Tìm bản chốt"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            className={cn(kInput, "flex-1 sm:w-60 sm:flex-none")}
+          />
+          <KBtn variant="secondary" onClick={refresh} aria-label="Tải lại" title="Tải lại" className="px-3">
+            <RefreshCw size={15} />
+          </KBtn>
+        </>
+      }
+    >
+      <KTable minWidth={620}>
+        <thead>
+          <tr>
+            <th className={cn(kTh, "w-9")} />
+            {["Ngày", "Lần chốt", "Người chốt", "Thời gian"].map((h) => (
+              <th key={h} className={cn(kTh, "text-left")}>
+                {h}
+              </th>
+            ))}
+            <th className={cn(kTh, "text-right")}>Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          {!rows ? (
+            <KEmptyRow colSpan={6}>{error ? <span className="text-[#c24141]">{error}</span> : "Đang tải..."}</KEmptyRow>
+          ) : !filtered.length ? (
+            <KEmptyRow colSpan={6}>{rows.length ? "Không có bản chốt phù hợp." : "Chưa có bản chốt."}</KEmptyRow>
+          ) : (
+            filtered.map((x) => {
               const isOpen = open === x.work_date;
               const d = details[x.work_date];
               return (
                 <Fragment key={`${x.work_date}-${x.version}`}>
-                  <Tr onClick={() => toggle(x.work_date)} className={cn(isOpen && "bg-surface-2")}>
-                    <Td>
-                      <ChevronDown size={16} className={cn("text-subtle transition-transform", isOpen && "rotate-180")} />
-                    </Td>
-                    <Td className="font-semibold">{fmtDateKey(x.work_date)}</Td>
-                    <Td>
-                      <Badge tone="brand">Lần {x.version}</Badge>
-                    </Td>
-                    <Td>{x.created_by || "—"}</Td>
-                    <Td className="whitespace-nowrap text-muted">{fmtDateTime(x.created_at)}</Td>
-                    <Td className="text-right">
-                      <Button
+                  <tr onClick={() => toggle(x.work_date)} className={cn(kTr, "cursor-pointer", isOpen && "bg-[#f8fbfe]")}>
+                    <td className={cn(kTd, "pr-0")}>
+                      <ChevronDown size={16} className={cn("text-[#66758a] transition-transform", isOpen && "rotate-180")} />
+                    </td>
+                    <td className={cn(kTd, "font-bold whitespace-nowrap")}>{fmtDateKey(x.work_date)}</td>
+                    <td className={kTd}>
+                      <KPill tone="blue">Lần {x.version}</KPill>
+                    </td>
+                    <td className={kTd}>{x.created_by || "—"}</td>
+                    <td className={cn(kTd, "whitespace-nowrap text-[#66758a]")}>{fmtDateTime(x.created_at)}</td>
+                    <td className={cn(kTd, "text-right")}>
+                      <KBtn
                         size="sm"
-                        variant="ghost"
-                        icon={ExternalLink}
+                        variant="secondary"
                         onClick={(e) => {
                           e.stopPropagation();
                           onOpenDate(x.work_date);
                         }}
                       >
                         Mở ngày
-                      </Button>
-                    </Td>
-                  </Tr>
+                      </KBtn>
+                    </td>
+                  </tr>
                   {isOpen ? (
                     <tr>
-                      <td colSpan={6} className="border-b border-line bg-surface-2 px-3 py-3 sm:px-5">
+                      <td colSpan={6} className="border-b border-[#edf1f5] bg-[#f6faff] px-3 py-3 sm:px-5">
                         {!d || d.loading ? (
                           <Spinner className="py-4" />
                         ) : d.error ? (
-                          <p className="py-2 text-sm text-danger-600">{d.error}</p>
+                          <p className="py-2 text-sm text-[#c24141]">{d.error}</p>
                         ) : !d.rows.length ? (
-                          <p className="py-2 text-sm text-muted">Bản chốt không có đơn hàng.</p>
+                          <p className="py-2 text-sm text-[#66758a]">Bản chốt không có đơn hàng.</p>
                         ) : (
-                          <div className="overflow-hidden rounded-lg border border-line bg-surface">
-                            <Table>
-                              <THead>
+                          <div className="overflow-x-auto rounded-lg border border-[#e0ebf7] bg-white">
+                            <table className="w-full min-w-[480px] border-separate border-spacing-0">
+                              <thead>
                                 <tr>
-                                  <Th>Đơn hàng</Th>
-                                  <Th align="right">Sản xuất</Th>
-                                  <Th align="right">Sang bao</Th>
-                                  <Th align="right">Lũy kế</Th>
-                                  <Th align="right">Còn lại</Th>
+                                  <th className={cn(subTh, "text-left")}>Đơn hàng</th>
+                                  <th className={cn(subTh, "text-right")}>Sản xuất</th>
+                                  <th className={cn(subTh, "text-right")}>Sang bao</th>
+                                  <th className={cn(subTh, "text-right")}>Lũy kế</th>
+                                  <th className={cn(subTh, "text-right")}>Còn lại</th>
                                 </tr>
-                              </THead>
+                              </thead>
                               <tbody>
                                 {d.rows.map((r) => (
-                                  <Tr key={r.order_key}>
-                                    <Td className="font-medium">{r.order_number}</Td>
-                                    <Td align="right">{fmtNumber(num(r.produced_today))} t</Td>
-                                    <Td align="right">{fmtNumber(num(r.repack_today))} t</Td>
-                                    <Td align="right">{fmtNumber(num(r.produced_cumulative))} t</Td>
-                                    <Td align="right">{fmtNumber(num(r.remaining))} t</Td>
-                                  </Tr>
+                                  <tr key={r.order_key} className={kTr}>
+                                    <td className={cn(kTd, "py-2 font-bold")}>{r.order_number}</td>
+                                    <td className={subTd}>{fmtNumber(num(r.produced_today), 2, "0")} tấn</td>
+                                    <td className={subTd}>{fmtNumber(num(r.repack_today), 2, "0")} tấn</td>
+                                    <td className={subTd}>{fmtNumber(num(r.produced_cumulative), 2, "0")} tấn</td>
+                                    <td className={subTd}>{fmtNumber(num(r.remaining), 2, "0")} tấn</td>
+                                  </tr>
                                 ))}
                               </tbody>
-                            </Table>
+                            </table>
                           </div>
                         )}
                       </td>
@@ -167,10 +171,10 @@ export function ClosingsTab({ onOpenDate }: { onOpenDate: (date: string) => void
                   ) : null}
                 </Fragment>
               );
-            })}
-          </tbody>
-        </Table>
-      )}
-    </Card>
+            })
+          )}
+        </tbody>
+      </KTable>
+    </KCard>
   );
 }

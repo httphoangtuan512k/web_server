@@ -1,50 +1,42 @@
 "use client";
 
-import { Cpu, SearchX } from "lucide-react";
-import { Badge, Card, EmptyState } from "@/components/ui/card";
 import { formatPlcValue, PLC_MACHINES } from "../../van-hanh/_shared/plc";
 import type { PlcLatestResponse } from "./types";
 
-/** Lưới giá trị tag realtime của 4 máy (machines.may1..may4). */
+/** Lưới giá trị tag realtime của 4 máy (machines.may1..may4) – như .machines/.machine/.value của trang cũ. */
 export function MachineTags({ latest, query, loading }: { latest: PlcLatestResponse | null; query: string; loading: boolean }) {
   const q = query.trim().toLocaleLowerCase("vi-VN");
   return (
-    <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+    <div className="grid grid-cols-1 gap-3.5 min-[651px]:grid-cols-2 min-[1001px]:grid-cols-4">
       {PLC_MACHINES.map(({ id, label }) => {
         const data = latest?.payload?.machines?.[id] ?? {};
         const all = Object.entries(data);
         const entries = q ? all.filter(([name]) => name.toLocaleLowerCase("vi-VN").includes(q)) : all;
         return (
-          <Card key={id} className="flex min-w-0 flex-col">
-            <div className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
-              <h3 className="flex items-center gap-2 font-semibold text-fg">
-                <Cpu size={16} className="text-brand-600" />
-                {label}
-                <span className="font-mono text-xs font-normal text-subtle">{id}</span>
-              </h3>
-              <Badge tone={all.length ? "brand" : "neutral"}>
-                <span className="num">{q ? `${entries.length}/${all.length}` : all.length}</span> thông số
-              </Badge>
+          <section key={id} className="min-w-0 rounded-xl border border-[#dbe3ed] bg-white p-3 shadow-[0_2px_8px_#0f172a0a] sm:p-4">
+            <div className="mb-2.5 flex items-center justify-between gap-2">
+              <h2 className="text-lg font-bold text-[#1e3a8a]">{label}</h2>
+              <span className="num text-[13px] text-[#64748b]">{q ? `${entries.length}/${all.length}` : all.length} thông số</span>
             </div>
             {loading ? (
-              <p className="p-6 text-center text-sm text-muted">Đang tải dữ liệu {label.toLowerCase()}…</p>
+              <div className="rounded-lg bg-[#f8fafc] p-5 text-center text-[#64748b]">Đang tải dữ liệu {label.toLowerCase()}...</div>
             ) : !all.length ? (
-              <EmptyState icon={Cpu} title="Chưa có dữ liệu từ máy này." />
+              <div className="rounded-lg bg-[#f8fafc] p-5 text-center text-[#64748b]">Chưa có dữ liệu từ máy này.</div>
             ) : !entries.length ? (
-              <EmptyState icon={SearchX} title="Không có tag khớp bộ lọc." />
+              <div className="rounded-lg bg-[#f8fafc] p-5 text-center text-[#64748b]">Không có tag khớp bộ lọc.</div>
             ) : (
-              <div className="grid grid-cols-2 gap-2 p-3">
+              <div className="grid grid-cols-2 gap-2">
                 {entries.map(([name, value]) => (
-                  <div key={name} className="min-w-0 rounded-lg border border-line bg-surface-2 px-3 py-2">
-                    <p className="text-[11px] leading-snug break-words text-muted" title={name}>
+                  <div key={name} className="min-w-0 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-[9px] transition-colors hover:border-[#bfdbfe] hover:bg-[#f1f7ff]">
+                    <div className="text-xs [overflow-wrap:anywhere] text-[#64748b]" title={name}>
                       {name}
-                    </p>
-                    <p className="num mt-1 text-[15px] font-semibold break-words text-fg">{formatPlcValue(value)}</p>
+                    </div>
+                    <div className="num mt-[5px] text-base font-bold [overflow-wrap:anywhere] text-[#172033]">{formatPlcValue(value)}</div>
                   </div>
                 ))}
               </div>
             )}
-          </Card>
+          </section>
         );
       })}
     </div>

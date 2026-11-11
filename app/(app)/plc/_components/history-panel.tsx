@@ -1,12 +1,10 @@
 "use client";
 
-import { ArrowDownUp, History, Pin, PinOff, Search } from "lucide-react";
+import { ArrowDownUp } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
+import { cn } from "@/lib/cn";
 import { VN_TZ } from "@/lib/format";
-import { Button } from "@/components/ui/button";
-import { Card, CardBody, CardHeader, EmptyState, Spinner } from "@/components/ui/card";
-import { Field, Input, Select } from "@/components/ui/form";
 import { useToast } from "@/components/ui/toast";
 import { PLC_MACHINES } from "../../van-hanh/_shared/plc";
 import { HistoryMatrix } from "./history-matrix";
@@ -101,96 +99,111 @@ export const HistoryPanel = memo(function HistoryPanel() {
   };
 
   return (
-    <Card>
-      <CardHeader
-        icon={History}
-        title="Lịch sử PLC"
-        description={`Mỗi cột là một thời điểm lưu (khoảng 1 phút/lần). Tối đa ${LIMIT.toLocaleString("vi-VN")} bản ghi mỗi lần tải.`}
-        actions={
-          <Button size="sm" variant="ghost" icon={ArrowDownUp} onClick={() => setNewestFirst((x) => !x)}>
-            {newestFirst ? "Mới nhất trước" : "Cũ nhất trước"}
-          </Button>
-        }
-      />
-      <CardBody className="flex flex-col gap-4">
-        <div className="grid grid-cols-2 items-end gap-3 md:grid-cols-3 xl:flex xl:flex-wrap">
-          <Field label="Chọn máy" htmlFor="plc-h-machine" className="xl:w-44">
-            <Select id="plc-h-machine" value={machine} onChange={(e) => setMachine(e.target.value as HistoryMachineFilter)}>
-              <option value="all">Tất cả máy</option>
-              {PLC_MACHINES.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Từ ngày" htmlFor="plc-h-from" className="xl:w-44">
-            <Input
-              id="plc-h-from"
-              type="date"
-              value={from}
-              max={to || undefined}
-              onChange={(e) => {
-                setFrom(e.target.value);
-                load(e.target.value, to);
-              }}
-            />
-          </Field>
-          <Field label="Đến ngày" htmlFor="plc-h-to" className="xl:w-44">
-            <Input
-              id="plc-h-to"
-              type="date"
-              value={to}
-              min={from || undefined}
-              onChange={(e) => {
-                setTo(e.target.value);
-                load(from, e.target.value);
-              }}
-            />
-          </Field>
-          <Button icon={Search} onClick={() => load()} loading={state.status === "loading"} className="xl:mr-4">
-            Tìm kiếm
-          </Button>
-          <Field label="Giờ / phút cần ghim" htmlFor="plc-h-pin" className="xl:w-40">
-            <Input id="plc-h-pin" type="time" step={60} value={pinTime} onChange={(e) => setPinTime(e.target.value)} />
-          </Field>
-          <div className="col-span-2 flex gap-2 md:col-span-1">
-            <Button variant="accent" icon={Pin} onClick={pin} className="flex-1 xl:flex-none">
-              Ghim
-            </Button>
-            <Button
-              variant="danger"
-              icon={PinOff}
-              className="flex-1 touch-manipulation select-none xl:flex-none"
-              title="Bấm để xóa ghim mới nhất; giữ 2 giây để xóa tất cả"
-              onClick={() => {
-                if (!holdTriggered.current) removeLatestPin();
-              }}
-              onPointerDown={startHold}
-              onPointerUp={endHold}
-              onPointerLeave={endHold}
-              onPointerCancel={endHold}
-              onContextMenu={(e) => e.preventDefault()}
-            >
-              Xóa ghim
-            </Button>
-          </div>
-        </div>
-        <p className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-muted">
-          Chọn giờ/phút rồi bấm <b>Ghim</b> để giữ mốc dữ liệu đó cạnh cột Tên tag (so sánh với các thời điểm khác). Bấm <b>Xóa ghim</b> để bỏ mốc ghim mới nhất; giữ nút liên tục 2 giây để bỏ tất cả. Kéo thanh
-          cuộn ngang để xem các thời điểm khác; hai cột Máy và Tên tag luôn cố định.
-        </p>
+    <section className="rounded-xl border border-[#dbe3ed] bg-white p-2.5 shadow-[0_2px_8px_#0f172a0a] sm:p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-lg font-bold text-[#1e3a8a]">Lịch sử PLC</h2>
+        <button
+          type="button"
+          onClick={() => setNewestFirst((x) => !x)}
+          className="inline-flex items-center gap-1.5 rounded-[7px] border border-[#cbd5e1] bg-white px-2.5 py-1.5 text-xs font-semibold text-[#475569] transition hover:border-[#1e3a8a] hover:text-[#1e3a8a]"
+        >
+          <ArrowDownUp size={13} />
+          {newestFirst ? "Mới nhất trước" : "Cũ nhất trước"}
+        </button>
+      </div>
 
-        {state.status === "loading" ? (
-          <Spinner label="Đang tải lịch sử…" />
-        ) : state.status === "error" ? (
-          <p className="rounded-lg bg-danger-50 px-4 py-6 text-center text-sm text-danger-600">{state.message}</p>
-        ) : !rows.length ? (
-          <EmptyState icon={History} title="Không có dữ liệu trong khoảng thời gian này." />
-        ) : (
-          <HistoryMatrix rows={rows} pins={pins} machine={machine} newestFirst={newestFirst} />
-        )}
-      </CardBody>
-    </Card>
+      <div className="grid grid-cols-2 items-end gap-2 sm:flex sm:flex-wrap">
+        <label className={lbl}>
+          Chọn máy
+          <select
+            className={ctl}
+            value={machine}
+            onChange={(e) => setMachine(e.target.value as HistoryMachineFilter)}
+          >
+            <option value="all">Tất cả máy</option>
+            {PLC_MACHINES.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={lbl}>
+          Từ ngày
+          <input
+            className={ctl}
+            type="date"
+            value={from}
+            max={to || undefined}
+            onChange={(e) => {
+              setFrom(e.target.value);
+              load(e.target.value, to);
+            }}
+          />
+        </label>
+        <label className={lbl}>
+          Đến ngày
+          <input
+            className={ctl}
+            type="date"
+            value={to}
+            min={from || undefined}
+            onChange={(e) => {
+              setTo(e.target.value);
+              load(from, e.target.value);
+            }}
+          />
+        </label>
+        <label className={lbl}>
+          Giờ / phút cần ghim
+          <input className={ctl} type="time" step={60} value={pinTime} onChange={(e) => setPinTime(e.target.value)} />
+        </label>
+        <div className="col-span-2 grid grid-cols-3 gap-2 sm:flex">
+          <button type="button" onClick={pin} className={cn(btn, "bg-[#1d4ed8] hover:bg-[#1e40af]")}>
+            Ghim
+          </button>
+          <button
+            type="button"
+            className={cn(btn, "touch-manipulation bg-[#dc2626] select-none hover:bg-[#b91c1c]")}
+            title="Bấm để xóa ghim mới nhất; giữ 2 giây để xóa tất cả"
+            onClick={() => {
+              if (!holdTriggered.current) removeLatestPin();
+            }}
+            onPointerDown={startHold}
+            onPointerUp={endHold}
+            onPointerLeave={endHold}
+            onPointerCancel={endHold}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            Xóa
+          </button>
+          <button type="button" onClick={() => load()} disabled={state.status === "loading"} className={cn(btn, "bg-[#1d4ed8] hover:bg-[#1e40af]")}>
+            Tìm kiếm
+          </button>
+        </div>
+      </div>
+      <p className="my-2 text-xs text-[#64748b]">
+        Chọn giờ/phút rồi bấm Ghim để lưu mốc dữ liệu vào cạnh cột Tên tag. Bấm Xóa để bỏ mốc ghim mới nhất; giữ nút Xóa liên tục 2 giây để bỏ tất cả.
+      </p>
+      <p className="my-2.5 text-[13px] text-[#64748b]">
+        Mỗi cột là một thời điểm lưu. Kéo thanh cuộn ngang để xem các thời điểm cũ hơn; hai cột Máy và Tên tag luôn được cố định. Tối đa {LIMIT.toLocaleString("vi-VN")} bản ghi mỗi lần tải.
+      </p>
+
+      {state.status === "loading" ? (
+        <div className={empty}>Đang tải lịch sử...</div>
+      ) : state.status === "error" ? (
+        <div className={cn(empty, "text-[#dc2626]")}>{state.message}</div>
+      ) : !rows.length ? (
+        <div className={empty}>Không có dữ liệu trong khoảng thời gian này.</div>
+      ) : (
+        <HistoryMatrix rows={rows} pins={pins} machine={machine} newestFirst={newestFirst} />
+      )}
+    </section>
   );
 });
+
+const lbl = "flex min-w-0 flex-col gap-[5px] text-xs text-[#64748b]";
+const ctl =
+  "min-h-9 w-full min-w-0 rounded-[7px] border border-[#cbd5e1] bg-white p-2 text-sm text-[#172033] outline-none focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#1d4ed8]/15 sm:w-auto";
+const btn = "min-h-9 rounded-[7px] px-[13px] py-[9px] text-sm font-medium text-white transition active:scale-[0.98] disabled:opacity-50";
+const empty = "rounded-lg bg-[#f8fafc] p-5 text-center text-[#64748b]";

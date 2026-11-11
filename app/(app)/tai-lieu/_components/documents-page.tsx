@@ -1,19 +1,19 @@
 "use client";
 
-import { FileSpreadsheet, Info, RefreshCw } from "lucide-react";
+import { Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
+import { cn } from "@/lib/cn";
 import { fmtBytes } from "@/lib/format";
-import { Button } from "@/components/ui/button";
-import { Badge, Card, CardHeader, EmptyState, PageHeader, Spinner } from "@/components/ui/card";
-import { SearchInput } from "@/components/ui/form";
+import { PageBody, PageTopbar } from "@/components/shell/page-topbar";
 import { useConfirm } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { DocumentList, type DocAccess, type DocActions } from "./document-list";
-import { FileDrop, uploadExcel, type UploadProgress } from "./file-drop";
+import { uploadExcel, UploadPicker, type UploadProgress } from "./file-drop";
 import { HistoryModal } from "./history-modal";
 import { PermissionModal } from "./permission-modal";
 import { validateExcel, type DocumentFile, type FilesResponse } from "./types";
+import { tlBtn } from "./tl-ui";
 import { acquireLock, UpdateModal, type EditLock } from "./update-modal";
 
 type Dialog =
@@ -153,72 +153,86 @@ export function DocumentsPage() {
     },
   };
 
-  return (
-    <>
-      <PageHeader title="Tài liệu" description="Kho tài liệu Excel dùng chung, phân quyền theo từng tài liệu" />
+  const emptyText = !data
+    ? error || "Đang tải..."
+    : !docs.length
+      ? data.files.length
+        ? "Không tìm thấy tài liệu phù hợp."
+        : "Chưa có tài liệu nào. Hãy tải file Excel đầu tiên lên."
+      : null;
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <Card>
-          <CardHeader icon={FileSpreadsheet} title="Tải tài liệu lên" actions={<Badge tone="brand">Phân quyền theo từng tài liệu</Badge>} />
-          <div className="space-y-3 p-4 sm:p-5">
-            <FileDrop onFile={upload} progress={progress} />
-            <p className="text-[13px] leading-relaxed text-muted">
-              Khi tải lên, chỉ người tạo và Super Admin được xem. Mọi người khác mặc định không có quyền; người tạo cần chủ động cấp quyền xem hoặc cập nhật cho
+  const panel = "rounded-xl border border-[#e2e8f0] bg-white p-3.5 shadow-[0_3px_12px_#0f172a08] sm:p-5";
+
+  return (
+    <div className="min-h-dvh bg-[#f3f5f8] text-[#1e293b]">
+      <PageTopbar title="QUẢN LÝ TÀI LIỆU" color="#172b3a" backLabel="← Về trang chủ" />
+
+      <PageBody className="space-y-[18px] sm:pt-7">
+        <div className="mx-auto w-full max-w-[1400px] space-y-[18px]">
+          {/* Kho tài liệu dùng chung: tải lên */}
+          <section className={panel}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-[17px] font-bold sm:text-[19px]">Kho tài liệu dùng chung</h2>
+              <span className="inline-block rounded-full bg-[#eff6ff] px-2 py-1 text-[11px] text-[#1d4ed8]">Phân quyền theo từng tài liệu</span>
+            </div>
+            <p className="mt-3 text-[13px] leading-relaxed text-[#64748b]">
+              Khi tải lên, chỉ người tạo và Super Admin được xem. Tất cả người khác mặc định không có quyền; người tạo cần chủ động cấp quyền xem hoặc cập nhật cho
               từng người.
             </p>
-          </div>
-        </Card>
-        <Card className="p-4 sm:p-5">
-          <div className="flex items-start gap-3">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-info-50 text-info-600">
-              <Info size={17} />
-            </span>
-            <div className="text-[13px] leading-relaxed text-muted">
-              <p className="mb-1 font-semibold text-fg">Cách sử dụng</p>
-              <p>
-                Bấm <b className="text-fg">Tải về</b> để mở bằng Microsoft Excel. Khi cần sửa, bấm <b className="text-fg">Cập nhật</b> để nhận quyền chỉnh sửa (người
-                khác chỉ xem được trong lúc này), sửa xong thì tải file đã lưu lên để ghi đè.
-              </p>
+            <div className="mt-3 -mx-2.5">
+              <UploadPicker onUpload={upload} progress={progress} />
             </div>
-          </div>
-        </Card>
-      </div>
+            <div className="mt-3 rounded-lg bg-[#fff7ed] p-3 text-[13px] leading-relaxed text-[#9a3412]">
+              Cách sử dụng: Chọn “Xem / Tải” để tải file về máy và mở bằng Microsoft Excel. Khi cần sửa, chọn “Cập nhật” để nhận quyền chỉnh sửa (người khác chỉ xem
+              được trong lúc này), lưu file trên máy tính rồi tải bản mới lên để ghi đè lên máy chủ. Chỉ người có quyền cập nhật mới thực hiện được thao tác này.
+            </div>
+          </section>
 
-      <Card className="mt-5">
-        <CardHeader
-          title="Danh sách tài liệu"
-          description={data ? `${data.files.length} tài liệu · ${fmtBytes(totalBytes)}` : undefined}
-          actions={
-            <>
-              <SearchInput placeholder="Tìm tên tài liệu / chủ sở hữu" value={q} onChange={(e) => setQ(e.target.value)} className="w-full sm:w-72" />
-              <Button variant="secondary" icon={RefreshCw} onClick={reload}>
-                Làm mới
-              </Button>
-            </>
-          }
-        />
-        {!data ? (
-          error ? (
-            <p className="px-5 py-10 text-center text-sm text-danger-600">{error}</p>
-          ) : (
-            <Spinner />
-          )
-        ) : !docs.length ? (
-          <EmptyState
-            icon={FileSpreadsheet}
-            title={data.files.length ? "Không tìm thấy tài liệu phù hợp." : "Chưa có tài liệu nào."}
-            description={data.files.length ? undefined : "Hãy tải file Excel đầu tiên lên."}
-          />
-        ) : (
-          <DocumentList docs={docs} accessOf={accessOf} actions={actions} isSuper={isSuper} downloading={downloading} />
-        )}
-      </Card>
+          {/* Danh sách tài liệu */}
+          <section className={panel}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="text-[17px] font-bold sm:text-[19px]">Danh sách tài liệu</h2>
+                {data ? (
+                  <p className="mt-0.5 text-xs text-[#64748b]">
+                    {data.files.length} tài liệu · {fmtBytes(totalBytes)}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex w-full items-center gap-2 sm:w-auto">
+                <label className="relative min-w-0 flex-1 sm:w-[260px] sm:flex-none">
+                  <Search size={14} className="pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 text-[#94a3b8]" />
+                  <input
+                    type="search"
+                    aria-label="Tìm tài liệu"
+                    placeholder="Tìm tên tài liệu / người tải lên"
+                    value={q}
+                    onChange={(e) => setQ(e.target.value)}
+                    className="min-h-8 w-full rounded-[7px] border border-[#cbd5e1] bg-white py-1.5 pr-2.5 pl-8 text-[13px] outline-none focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/20"
+                  />
+                </label>
+                <button type="button" className={cn(tlBtn.base, tlBtn.sm, tlBtn.gray)} onClick={reload}>
+                  ↻ Làm mới
+                </button>
+              </div>
+            </div>
+            <DocumentList
+              docs={docs}
+              accessOf={accessOf}
+              actions={actions}
+              isSuper={isSuper}
+              downloading={downloading}
+              empty={emptyText ? <span className={!data && error ? "text-[#b91c1c]" : undefined}>{emptyText}</span> : null}
+            />
+          </section>
+        </div>
+      </PageBody>
 
       {dialog?.kind === "update" ? (
         <UpdateModal doc={dialog.doc} initialLock={dialog.lock} onClose={() => setDialog(null)} onUpdated={reload} onDownload={download} />
       ) : null}
       {dialog?.kind === "permissions" ? <PermissionModal doc={dialog.doc} onClose={() => setDialog(null)} onSaved={reload} /> : null}
       {dialog?.kind === "history" ? <HistoryModal doc={dialog.doc} onClose={() => setDialog(null)} /> : null}
-    </>
+    </div>
   );
 }

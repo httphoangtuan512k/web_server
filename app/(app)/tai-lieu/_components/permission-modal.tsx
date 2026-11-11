@@ -1,14 +1,14 @@
 "use client";
 
-import { Save, Users } from "lucide-react";
+import { Loader2, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { Button } from "@/components/ui/button";
 import { EmptyState, Spinner } from "@/components/ui/card";
 import { SearchInput, Select } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
+import { tlBtn } from "./tl-ui";
 import type { DocPermission, DocUser, DocumentFile } from "./types";
 
 type Perm = "view" | "edit";
@@ -77,12 +77,13 @@ export function PermissionModal({ doc, onClose, onSaved }: { doc: DocumentFile; 
       footer={
         <>
           <span className="mr-auto self-center text-[13px] text-muted">Đã cấp quyền cho {count} người</span>
-          <Button variant="secondary" onClick={onClose}>
+          <button type="button" className={cn(tlBtn.base, tlBtn.md, tlBtn.gray)} onClick={onClose}>
             Đóng
-          </Button>
-          <Button icon={Save} loading={saving} disabled={!users} onClick={save}>
+          </button>
+          <button type="button" className={cn(tlBtn.base, tlBtn.md, tlBtn.blue)} disabled={!users || saving} onClick={save}>
+            {saving ? <Loader2 size={15} className="animate-spin" /> : null}
             Lưu phân quyền
-          </Button>
+          </button>
         </>
       }
     >

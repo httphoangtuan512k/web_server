@@ -1,83 +1,82 @@
 "use client";
 
-import { Clock, Radio, RefreshCw, Server, Tags } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { fmtDateTime, fmtRelative } from "@/lib/format";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { useTick } from "../../van-hanh/_shared/hooks";
 import { PLC_DEVICE_ID } from "../../van-hanh/_shared/plc";
-import { StatusLight } from "../../van-hanh/_shared/status-light";
 import type { PlcLatestResponse } from "./types";
 
-/** Thẻ trạng thái kết nối PLC: đèn xanh/đỏ, lần nhận cuối ("x giây trước"), tổng số tag. */
-export function ConnectionCard({ latest, error, onRefresh, refreshing }: { latest: PlcLatestResponse | null; error: string; onRefresh: () => void; refreshing: boolean }) {
+/** Thanh trạng thái (.toolbar cũ): thiết bị gửi, lần nhận cuối, "● Máy B Online/Offline" + nút Làm mới. */
+export function ConnectionCard({
+  latest,
+  error,
+  onRefresh,
+  refreshing,
+  query,
+  onQuery,
+}: {
+  latest: PlcLatestResponse | null;
+  error: string;
+  onRefresh: () => void;
+  refreshing: boolean;
+  query: string;
+  onQuery: (q: string) => void;
+}) {
   useTick(1000);
   const loaded = !!latest || !!error;
   const connected = !!latest?.connected && !error;
   const machines = latest?.payload?.machines ?? {};
   const tagCount = Object.values(machines).reduce((n, m) => n + Object.keys(m ?? {}).length, 0);
-  const machineCount = Object.values(machines).filter((m) => m && Object.keys(m).length).length;
+  const status = !loaded ? "● Đang kiểm tra kết nối" : error ? error : connected ? "● Máy B đang Online" : "● Máy B Offline";
 
-  const title = !loaded ? "Đang kiểm tra kết nối" : error ? error : connected ? "Máy B đang Online" : "Máy B Offline";
   return (
-    <Card className="mb-6 overflow-hidden">
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-4 p-5">
-        <div className="flex min-w-0 flex-1 items-center gap-4">
-          <span
-            className={cn(
-              "grid h-14 w-14 shrink-0 place-items-center rounded-2xl",
-              !loaded ? "bg-surface-3" : connected ? "bg-success-50" : "bg-danger-50",
+    <section className="mb-4 rounded-xl border border-[#dbe3ed] bg-white p-3 shadow-[0_2px_8px_#0f172a0a] sm:p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[15px] text-[#172033]">
+            Thiết bị gửi dữ liệu: <b>{latest?.device_id || PLC_DEVICE_ID}</b>
+          </div>
+          <div className="num text-[13px] text-[#64748b]">
+            {latest?.received_at ? (
+              <>
+                Nhận dữ liệu cuối: {fmtDateTime(latest.received_at)} <span className="text-[#94a3b8]">({fmtRelative(latest.received_at)})</span>
+              </>
+            ) : (
+              "Chưa nhận dữ liệu từ máy B"
             )}
-          >
-            <StatusLight tone={!loaded ? "neutral" : connected ? "success" : "danger"} pulse={connected} size="lg" />
-          </span>
-          <div className="min-w-0">
-            <p className={cn("text-lg font-semibold", !loaded ? "text-muted" : connected ? "text-success-600" : "text-danger-600")}>{title}</p>
-            <p className="text-[13px] text-muted">
-              Thiết bị gửi dữ liệu: <b className="font-mono text-fg">{latest?.device_id || PLC_DEVICE_ID}</b> · làm mới mỗi giây
-            </p>
           </div>
         </div>
-        <Button variant="secondary" icon={RefreshCw} loading={refreshing} onClick={onRefresh}>
-          Làm mới
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={cn("font-bold", connected ? "text-[#15803d]" : "text-[#dc2626]")}>
+            <span className={cn("inline-block", connected && "animate-pulse")}>{status}</span>
+          </span>
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={refreshing}
+            className="rounded-[7px] bg-[#1d4ed8] px-[13px] py-[9px] text-sm font-medium text-white transition hover:bg-[#1e40af] disabled:opacity-50"
+          >
+            Làm mới
+          </button>
+        </div>
       </div>
-      <dl className="grid grid-cols-1 gap-px border-t border-line bg-line sm:grid-cols-3">
-        <Meta icon={Clock} label="Nhận dữ liệu cuối">
-          {latest?.received_at ? (
-            <>
-              <span className="num">{fmtDateTime(latest.received_at)}</span>
-              <span className="num ml-2 text-muted">({fmtRelative(latest.received_at)})</span>
-            </>
-          ) : (
-            <span className="text-muted">Chưa nhận dữ liệu từ máy B</span>
-          )}
-        </Meta>
-        <Meta icon={Radio} label="Mốc thời gian từ C#">
-          <span className="num">{latest?.payload?.source_timestamp || "—"}</span>
-        </Meta>
-        <Meta icon={Tags} label="Thông số đang nhận">
-          <span className="num">{tagCount}</span> tag · <span className="num">{machineCount}</span>/4 máy có dữ liệu
-        </Meta>
-      </dl>
-      {latest && !latest.connected && latest.payload ? (
-        <p className="flex items-center gap-2 border-t border-line bg-warning-50 px-5 py-2 text-xs text-warning-600">
-          <Server size={14} /> Đang hiển thị dữ liệu nhận lần cuối – PLC chưa gửi dữ liệu mới trong 5 giây gần đây.
-        </p>
-      ) : null}
-    </Card>
-  );
-}
-
-function Meta({ icon: Icon, label, children }: { icon: typeof Clock; label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-start gap-3 bg-surface-2 px-5 py-3">
-      <Icon size={16} className="mt-0.5 shrink-0 text-subtle" />
-      <div className="min-w-0">
-        <dt className="text-[11px] font-medium tracking-wide text-muted uppercase">{label}</dt>
-        <dd className="truncate text-sm text-fg">{children}</dd>
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[#eef2f7] pt-3 text-xs text-[#64748b]">
+        <span>
+          Mốc thời gian từ C#: <b className="num font-semibold text-[#334155]">{latest?.payload?.source_timestamp || "—"}</b>
+        </span>
+        <span>
+          Đang nhận: <b className="num font-semibold text-[#334155]">{tagCount}</b> tag
+        </span>
+        {latest && !latest.connected && latest.payload ? <span className="text-[#b45309]">Đang hiển thị dữ liệu nhận lần cuối (không có dữ liệu mới trong 5 giây).</span> : null}
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => onQuery(e.target.value)}
+          placeholder="Lọc theo tên tag…"
+          aria-label="Lọc theo tên tag"
+          className="ml-auto min-h-9 w-full rounded-[7px] border border-[#cbd5e1] bg-white px-2.5 text-sm text-[#172033] outline-none focus:border-[#1d4ed8] focus:ring-2 focus:ring-[#1d4ed8]/15 sm:w-64"
+        />
       </div>
-    </div>
+    </section>
   );
 }

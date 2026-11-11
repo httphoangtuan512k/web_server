@@ -1,13 +1,9 @@
 "use client";
 
-import { Activity, Gauge } from "lucide-react";
-import Link from "next/link";
 import { useCallback, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
-import { Button } from "@/components/ui/button";
-import { PageHeader } from "@/components/ui/card";
-import { SearchInput } from "@/components/ui/form";
 import { PageGuard } from "@/components/shell/page-guard";
+import { PageBody, PageTopbar, TopbarLink } from "@/components/shell/page-topbar";
 import { usePolling } from "../../van-hanh/_shared/hooks";
 import { ConnectionCard } from "./connection-card";
 import { HistoryPanel } from "./history-panel";
@@ -49,33 +45,21 @@ function PlcView() {
   }
 
   return (
-    <>
-      <PageHeader
-        title="Giám sát PLC"
-        description="Dữ liệu thời gian thực và lịch sử các tag PLC gửi từ Máy B cho 4 máy."
-        actions={
-          <Link href="/van-hanh">
-            <Button variant="secondary" icon={Gauge}>
-              Xưởng vận hành
-            </Button>
-          </Link>
-        }
+    <div className="min-h-dvh bg-[#f1f5f9] text-[#172033]">
+      <PageTopbar
+        title="Giám sát dữ liệu PLC"
+        color="#1e3a8a"
+        backLabel="Trang chủ"
+        className="[&>div:first-child]:basis-48"
+        actions={<TopbarLink href="/van-hanh">← Vận hành máy</TopbarLink>}
       />
-
-      <ConnectionCard latest={latest} error={error} onRefresh={refreshNow} refreshing={refreshing} />
-
-      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
-        <h2 className="flex items-center gap-2 text-[17px] font-semibold text-fg">
-          <Activity size={19} className="text-brand-600" />
-          Giá trị tag theo máy
-        </h2>
-        <SearchInput placeholder="Lọc theo tên tag…" value={query} onChange={(e) => setQuery(e.target.value)} className="w-full sm:w-72" aria-label="Lọc theo tên tag" />
-      </div>
-      <div className="mb-8">
-        <MachineTags latest={latest} query={query} loading={!latest && !error} />
-      </div>
-
-      <HistoryPanel />
-    </>
+      <PageBody className="max-w-[1600px]!">
+        <ConnectionCard latest={latest} error={error} onRefresh={refreshNow} refreshing={refreshing} query={query} onQuery={setQuery} />
+        <div className="mb-4">
+          <MachineTags latest={latest} query={query} loading={!latest && !error} />
+        </div>
+        <HistoryPanel />
+      </PageBody>
+    </div>
   );
 }

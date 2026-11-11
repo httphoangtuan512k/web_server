@@ -1,37 +1,30 @@
 "use client";
 
-import { CheckCheck, Eye, Pause, Pencil, Play, PlayCircle, PlusCircle, Trash2, type LucideIcon } from "lucide-react";
 import { useCallback, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { MachineDialog, type MachineDialogKind } from "./machine-dialog";
+import { SmallButton } from "./order-bits";
 import type { OrderGroup, OrderPerms } from "./types";
 import { fmtTons, toNum } from "./utils";
 
 export type OrderActionKind = "view" | "edit" | "start" | "resume" | "pause" | "addMachine" | "complete" | "delete";
 
-interface ActionDef {
-  label: string;
-  short?: string;
-  icon: LucideIcon;
-  variant: "primary" | "secondary" | "ghost" | "danger" | "accent" | "success";
-}
-
-const DEFS: Record<OrderActionKind, ActionDef> = {
-  view: { label: "Xem chi tiết", short: "Xem", icon: Eye, variant: "secondary" },
-  start: { label: "Chạy", icon: Play, variant: "primary" },
-  resume: { label: "Chạy tiếp", icon: PlayCircle, variant: "success" },
-  pause: { label: "Tạm dừng", icon: Pause, variant: "accent" },
-  addMachine: { label: "Chạy thêm máy", short: "Thêm máy", icon: PlusCircle, variant: "secondary" },
-  complete: { label: "Xác nhận hoàn thành", short: "Xác nhận xong", icon: CheckCheck, variant: "success" },
-  edit: { label: "Sửa đơn", short: "Sửa", icon: Pencil, variant: "ghost" },
-  delete: { label: "Xóa đơn", short: "Xóa", icon: Trash2, variant: "ghost" },
+/** Chữ + màu nền đúng như nút `.small` trang cũ (kehoach.html). */
+const DEFS: Record<OrderActionKind, { text: string; title: string; bg: string; dark?: boolean }> = {
+  view: { text: "👁 Xem", title: "Xem chi tiết", bg: "#e2e8f0" },
+  start: { text: "▶ Chạy", title: "Bắt đầu chạy", bg: "#2563eb", dark: true },
+  resume: { text: "▶ Chạy tiếp", title: "Chạy tiếp", bg: "#10b981", dark: true },
+  pause: { text: "⏸ Tạm dừng", title: "Tạm dừng", bg: "#d97706", dark: true },
+  addMachine: { text: "▶ Chạy thêm máy", title: "Chạy thêm máy", bg: "#2563eb", dark: true },
+  complete: { text: "✔ Xác nhận xong", title: "Xác nhận hoàn thành", bg: "#065f46", dark: true },
+  edit: { text: "Sửa", title: "Sửa đơn", bg: "#0ea5e9", dark: true },
+  delete: { text: "Xóa", title: "Xóa đơn", bg: "#ef4444", dark: true },
 };
 
-/** Các thao tác hợp lệ cho một đơn theo trạng thái + quyền (giống trang cũ). */
+/** Các thao tác hợp lệ cho một đơn theo trạng thái + quyền (giống trang cũ, đúng thứ tự nút). */
 export function availableActions(g: OrderGroup, perms: OrderPerms): OrderActionKind[] {
   const out: OrderActionKind[] = [];
   if (g.status === "new" && perms.operate) out.push("start");
@@ -45,15 +38,13 @@ export function availableActions(g: OrderGroup, perms: OrderPerms): OrderActionK
   return out;
 }
 
-/** Hàng nút thao tác. `compact`: nút Sửa/Xóa chỉ hiện icon (bảng desktop). */
+/** Hàng nút thao tác kiểu trang cũ: `👁 Xem` (nếu `withView`) → chạy/dừng/xác nhận → `Sửa` → `Xóa`. */
 export function OrderActionButtons({
   group,
   perms,
   onAction,
   pending,
   withView,
-  compact,
-  hideEmpty,
   className,
 }: {
   group: OrderGroup;
@@ -61,37 +52,26 @@ export function OrderActionButtons({
   onAction: (kind: OrderActionKind, g: OrderGroup) => void;
   pending?: string | null;
   withView?: boolean;
-  compact?: boolean;
-  /** Không hiện "—" khi không có thao tác nào. */
-  hideEmpty?: boolean;
   className?: string;
 }) {
   const kinds = availableActions(group, perms);
   if (withView) kinds.unshift("view");
-  if (!kinds.length) return hideEmpty ? null : <span className="text-xs text-subtle">—</span>;
+  if (!kinds.length) return null;
   return (
-    <div className={cn("flex flex-wrap items-center gap-1.5", className)} onClick={(e) => e.stopPropagation()}>
+    <div className={cn("flex flex-wrap items-center gap-1", className)} onClick={(e) => e.stopPropagation()}>
       {kinds.map((k) => {
         const d = DEFS[k];
-        const iconOnly = compact && (k === "edit" || k === "delete" || k === "view");
         return (
-          <Button
+          <SmallButton
             key={k}
-            size={iconOnly ? "icon" : "sm"}
-            variant={d.variant}
-            icon={d.icon}
+            bg={d.bg}
+            dark={d.dark}
             loading={pending === `${k}:${group.id}`}
-            title={d.label}
-            aria-label={d.label}
+            title={d.title}
             onClick={() => onAction(k, group)}
-            className={cn(
-              iconOnly && "h-8 w-8",
-              k === "delete" && "text-danger-600! hover:bg-danger-50! hover:text-danger-700!",
-              k === "edit" && !iconOnly && "border border-line-strong",
-            )}
           >
-            {iconOnly ? null : compact ? (d.short ?? d.label) : d.label}
-          </Button>
+            {d.text}
+          </SmallButton>
         );
       })}
     </div>

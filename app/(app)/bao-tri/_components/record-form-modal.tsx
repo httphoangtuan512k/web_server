@@ -1,13 +1,14 @@
 "use client";
 
-import { Save } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useState } from "react";
 import { api, errorMessage } from "@/lib/api";
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 import { Field, Input, Textarea } from "@/components/ui/form";
 import { ImageInput } from "@/components/ui/image-input";
 import { Modal, useConfirm } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
+import { btn } from "./record-card";
 import { afterImageOf, faultImageOf, type MaintenanceInput, type MaintenanceRecord } from "./types";
 
 /** Ghi nhận mới (record = null) hoặc Super Admin sửa bản ghi đã lưu. */
@@ -67,41 +68,45 @@ export function RecordFormModal({ record, onClose, onSaved }: { record: Maintena
       open
       onClose={requestClose}
       size="lg"
-      title={record ? `Chỉnh sửa bản ghi #${record.id}` : "Ghi nhận bảo trì / bảo dưỡng"}
-      description={
-        record ? "Super Admin chỉnh sửa dữ liệu đã lưu – thay đổi được ghi nhật ký." : "Sau khi lưu, chỉ Super Admin mới được sửa hoặc xóa bản ghi."
+      title={
+        <>
+          <span className="block text-[11px] font-extrabold tracking-[1.3px] text-[#0f766e]">SUPER WHITE · MAINTENANCE</span>
+          <span className="mt-1 block text-lg text-[#203f8e]">{record ? `Super Admin - chỉnh sửa bản ghi #${record.id}` : "Nhập thông tin bảo trì / bảo dưỡng"}</span>
+        </>
       }
+      description="Sau khi lưu, bản ghi được đưa vào lịch sử. Chỉ Super Admin mới được sửa hoặc xóa dữ liệu đã lưu."
       footer={
         <>
-          <Button variant="secondary" onClick={requestClose} disabled={saving}>
-            Hủy
-          </Button>
-          <Button type="submit" form="maintenance-form" icon={Save} loading={saving}>
+          <button type="button" className={cn(btn.base, btn.secondary)} onClick={requestClose} disabled={saving}>
+            {record ? "Hủy chỉnh sửa" : "Hủy"}
+          </button>
+          <button type="submit" form="maintenance-form" className={cn(btn.base, btn.primary)} disabled={saving}>
+            {saving ? <Loader2 size={15} className="animate-spin" /> : null}
             {record ? "Lưu thay đổi" : "Lưu vào lịch sử"}
-          </Button>
+          </button>
         </>
       }
     >
       <form id="maintenance-form" onSubmit={save} className="grid gap-5 md:grid-cols-2">
         <fieldset className="space-y-4 md:border-r md:border-line md:pr-5">
-          <legend className="mb-3 text-xs font-semibold tracking-wide text-danger-600 uppercase">Sự cố</legend>
+          <legend className="mb-3 text-xs font-bold tracking-wide text-[#dc2626] uppercase">Sự cố</legend>
           <Field label="Thiết bị" required>
-            <Input value={f.equipment} maxLength={180} placeholder="VD: Máy nghiền đứng số 1" onChange={(e) => set("equipment", e.target.value)} required autoFocus />
+            <Input value={f.equipment} maxLength={180} placeholder="Ví dụ: Máy nghiền đứng số 1" onChange={(e) => set("equipment", e.target.value)} required autoFocus />
           </Field>
           <Field label="Hư hỏng / hiện tượng" required>
-            <Textarea value={f.faultDescription} placeholder="Mô tả tình trạng hư hỏng…" onChange={(e) => set("faultDescription", e.target.value)} required />
+            <Textarea value={f.faultDescription} placeholder="Mô tả tình trạng hư hỏng..." onChange={(e) => set("faultDescription", e.target.value)} required />
           </Field>
           <Field label="Hình ảnh hư hỏng">
             <ImageInput folder="maintenance" value={f.faultImage} onChange={(v) => set("faultImage", v)} label="Chụp / chọn ảnh" />
           </Field>
         </fieldset>
         <fieldset className="space-y-4">
-          <legend className="mb-3 text-xs font-semibold tracking-wide text-success-700 uppercase">Sửa chữa</legend>
+          <legend className="mb-3 text-xs font-bold tracking-wide text-[#0f766e] uppercase">Sửa chữa</legend>
           <Field label="Nội dung sửa chữa">
-            <Textarea value={f.repairContent} placeholder="Các công việc đã thực hiện, vật tư thay thế…" onChange={(e) => set("repairContent", e.target.value)} />
+            <Textarea value={f.repairContent} placeholder="Các công việc đã thực hiện, vật tư thay thế..." onChange={(e) => set("repairContent", e.target.value)} />
           </Field>
-          <Field label="Tình trạng sau sửa chữa">
-            <Textarea value={f.afterStatus} placeholder="VD: Đã hoạt động bình thường, chạy thử đạt…" onChange={(e) => set("afterStatus", e.target.value)} />
+          <Field label="Trạng thái sau sửa chữa">
+            <Textarea value={f.afterStatus} placeholder="Ví dụ: Đã hoạt động bình thường, chạy thử đạt..." onChange={(e) => set("afterStatus", e.target.value)} />
           </Field>
           <Field label="Hình ảnh sau sửa chữa">
             <ImageInput folder="maintenance" value={f.afterImage} onChange={(v) => set("afterImage", v)} label="Chụp / chọn ảnh" />

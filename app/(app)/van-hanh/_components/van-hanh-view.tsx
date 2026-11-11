@@ -1,25 +1,22 @@
 "use client";
 
-import { Cog, Cpu, ExternalLink, Factory, PauseCircle, PlayCircle, RefreshCw, Timer } from "lucide-react";
-import Link from "next/link";
+import { ExternalLink, RefreshCw } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { Button } from "@/components/ui/button";
-import { PageHeader, Skeleton, StatCard } from "@/components/ui/card";
+import { cn } from "@/lib/cn";
 import { Modal, useConfirm } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { PageGuard } from "@/components/shell/page-guard";
+import { PageBody, PageTopbar, TopbarLink } from "@/components/shell/page-topbar";
 import { usePolling } from "../_shared/hooks";
 import { machineIdFromName, MILLS, plcNumber } from "../_shared/plc";
-import { PlcConnectionPill } from "../_shared/status-light";
 import { EditOrderModal } from "./edit-order-modal";
 import { HistoryLogCard } from "./history-log";
 import { MachineDialog, type MachineDialogRequest } from "./machine-dialog";
 import { MillCard } from "./mill-card";
-import type { OrderHandlers } from "./order-card";
 import { QueueTable, type QueueHandlers } from "./queue-table";
-import { RunningBoard } from "./running-board";
+import { RunningTable, type OrderHandlers } from "./running-table";
 import { computeScada } from "./scada";
 import type { HistoryLog, OperatorPerms, Order, OrdersResponse, PlcLatestResponse, PlcMachineId, PlcPatchStateResponse, PlcStateKey } from "./types";
 
@@ -239,69 +236,67 @@ function VanHanhView() {
     },
   };
 
+  const plcLoaded = !!latest || !!plcError;
+  const plcTone = !plcLoaded ? "bg-[#94a3b8]" : plcError ? "bg-[#d97706]" : latest?.connected ? "bg-[#16a34a]" : "bg-[#dc2626]";
+  const plcText = !plcLoaded ? "Đang kiểm tra PLC" : plcError ? "Lỗi tải dữ liệu PLC" : latest?.connected ? "PLC Online" : "PLC Offline";
+
   return (
-    <>
-      <PageHeader
-        title="Xưởng vận hành"
-        description="Theo dõi 2 máy nghiền SCLM-1100 theo thời gian thực và điều hành các đơn đang chạy."
+    <div className="min-h-dvh bg-[#f0f4f8]">
+      <PageTopbar
+        title="Xưởng Vận Hành"
+        color="#1e3a8a"
+        className="[&>div:first-child]:basis-40"
         actions={
-          <>
-            <PlcConnectionPill connected={!!latest?.connected} receivedAt={latest?.received_at ?? ""} error={plcError} loaded={!!latest || !!plcError} />
-            <Link href="/plc">
-              <Button variant="secondary" icon={Cpu}>
-                Dữ liệu PLC
-              </Button>
-            </Link>
-            <Button variant="secondary" icon={RefreshCw} loading={refreshing} onClick={refreshAll}>
-              Làm mới
-            </Button>
-          </>
+          <TopbarLink href="/plc" className="border-transparent! bg-[#0f766e]! hover:bg-[#0d6a63]! hover:text-white!">
+            📊 Dữ liệu PLC
+          </TopbarLink>
         }
       />
 
-      {/* Tóm tắt */}
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Đơn đang chạy" value={ordersResp ? running.length : "—"} icon={PlayCircle} tone="success" hint={`${new Set(running.map((o) => o.machineName || "")).size} máy có đơn`} />
-        <StatCard label="Máy nghiền đang chạy" value={latest ? millsRunning : "—"} unit={`/ ${MILLS.length}`} icon={Cog} tone="brand" hint={latest?.connected ? "Theo tín hiệu PLC" : "PLC chưa kết nối"} />
-        <StatCard label="Đơn tạm dừng" value={ordersResp ? paused.length : "—"} icon={PauseCircle} tone="warning" />
-        <StatCard label="Đơn chờ chạy" value={ordersResp ? waiting.length : "—"} icon={Timer} tone="accent" />
-      </div>
-
-      {/* Máy nghiền */}
-      <SectionTitle icon={Factory} title="Máy nghiền SCLM-1100" hint={perms.canPlc ? "Bấm vào ô số để chỉnh tồn phễu, mức đầy, tồn silo và hệ số – lưu khi rời ô hoặc nhấn Enter." : "Chỉ xem – tài khoản chưa được cấp quyền vận hành máy."} />
-      <div className="mb-8 grid gap-4">
-        {views.map(({ cfg, view }) => (
-          <MillCard
-            key={cfg.machine}
-            cfg={cfg}
-            view={view}
-            orders={running.filter((o) => machineIdFromName(o.machineName) === cfg.machine)}
-            canEdit={perms.canPlc}
-            onSave={(key, raw) => saveSetting(cfg.machine, key, raw)}
-          />
-        ))}
-      </div>
-
-      {/* Đơn đang chạy */}
-      <SectionTitle icon={PlayCircle} title="Đơn đang chạy theo máy" hint={ordersError ? `Lỗi tải danh sách đơn: ${ordersError}` : undefined} danger={!!ordersError} />
-      <div className="mb-8">
-        {ordersResp ? (
-          <RunningBoard orders={running} perms={perms} handlers={orderHandlers} />
-        ) : ordersError ? null : (
-          <div className="grid gap-4 xl:grid-cols-2">
-            <Skeleton className="h-72 rounded-[14px]" />
-            <Skeleton className="h-72 rounded-[14px]" />
-          </div>
-        )}
-      </div>
-
-      {ordersResp ? (
-        <div className="mb-8">
-          <QueueTable paused={paused} waiting={waiting} perms={perms} handlers={queueHandlers} />
+      <PageBody className="flex flex-col gap-3 sm:gap-4">
+        {/* Hai máy nghiền: xếp chồng như bản gốc, đặt cạnh nhau trên màn hình rộng */}
+        <div className="grid gap-3 sm:gap-4 xl:grid-cols-2">
+          {views.map(({ cfg, view }) => (
+            <MillCard
+              key={cfg.machine}
+              cfg={cfg}
+              view={view}
+              orders={running.filter((o) => machineIdFromName(o.machineName) === cfg.machine)}
+              canEdit={perms.canPlc}
+              onSave={(key, raw) => saveSetting(cfg.machine, key, raw)}
+            />
+          ))}
         </div>
-      ) : null}
 
-      <HistoryLogCard logs={logs} error={logsError} />
+        {/* Đơn đang chạy – bảng như bản gốc */}
+        <RunningTable orders={running} perms={perms} handlers={orderHandlers} loading={!ordersResp} error={ordersResp ? "" : ordersError} />
+        {ordersResp && ordersError ? <p className="-mt-1 text-[13px] text-[#dc2626]">Lỗi tải lại danh sách đơn: {ordersError}</p> : null}
+
+        {/* Phần bổ sung (không có ở bản gốc): tóm tắt, hàng chờ, nhật ký */}
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px]">
+          <span className="inline-flex h-8 items-center gap-2 rounded-full border border-[#dbe3ed] bg-white px-3 font-semibold text-[#334155]" title={latest?.received_at ? `Nhận dữ liệu cuối: ${latest.received_at}` : undefined}>
+            <span className={cn("h-2 w-2 rounded-full", plcTone)} />
+            {plcText}
+          </span>
+          <Chip label="Đơn đang chạy" value={ordersResp ? running.length : "—"} />
+          <Chip label="Máy nghiền chạy" value={latest ? `${millsRunning}/${MILLS.length}` : "—"} />
+          <Chip label="Tạm dừng" value={ordersResp ? paused.length : "—"} />
+          <Chip label="Chờ chạy" value={ordersResp ? waiting.length : "—"} />
+          <button
+            type="button"
+            onClick={refreshAll}
+            disabled={refreshing}
+            className="ml-auto inline-flex h-8 items-center gap-1.5 rounded-md border border-[#cbd5e1] bg-white px-3 font-semibold text-[#1e3a8a] transition hover:border-[#1e3a8a] disabled:opacity-60"
+          >
+            <RefreshCw size={14} className={cn(refreshing && "animate-spin")} />
+            Làm mới
+          </button>
+        </div>
+
+        {ordersResp ? <QueueTable paused={paused} waiting={waiting} perms={perms} handlers={queueHandlers} /> : null}
+
+        <HistoryLogCard logs={logs} error={logsError} />
+      </PageBody>
 
       <MachineDialog request={machineReq} suggestions={machineSuggestions} onClose={() => setMachineReq(null)} />
       <EditOrderModal order={editing} onClose={() => setEditing(null)} onSaved={() => void loadOrders()} />
@@ -316,18 +311,15 @@ function VanHanhView() {
           </div>
         ) : null}
       </Modal>
-    </>
+    </div>
   );
 }
 
-function SectionTitle({ icon: Icon, title, hint, danger }: { icon: typeof Factory; title: string; hint?: string; danger?: boolean }) {
+function Chip({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="mb-3 flex flex-wrap items-end justify-between gap-x-4 gap-y-1">
-      <h2 className="flex items-center gap-2 text-[17px] font-semibold text-fg">
-        <Icon size={19} className="text-brand-600" />
-        {title}
-      </h2>
-      {hint ? <p className={danger ? "text-[13px] text-danger-600" : "text-[13px] text-muted"}>{hint}</p> : null}
-    </div>
+    <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-[#dbe3ed] bg-white px-3 text-[#64748b]">
+      {label}
+      <b className="num text-[#0f172a]">{value}</b>
+    </span>
   );
 }

@@ -1,28 +1,25 @@
 "use client";
 
-import { MonitorSmartphone, RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
+import { cn } from "@/lib/cn";
 import { fmtDateTime, fmtRelative } from "@/lib/format";
-import { Button } from "@/components/ui/button";
-import { Badge, Card, CardHeader, EmptyState, Spinner } from "@/components/ui/card";
-import { SearchInput, Select } from "@/components/ui/form";
-import { Table, Td, Th, THead, Tr } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
+import { OgButton, OgCard, OgCardTitle, OgEmptyRow, ogInput, OgPill, OgTable, OgTd, OgTh, OgTr } from "../../_shared/og-button";
 import { useApiData } from "../../_shared/use-api-data";
 import { matchesQuery, normalizeText, shortUserAgent } from "../../_shared/utils";
 import type { LoginSession } from "./types";
 
-type Tone = "success" | "neutral" | "warning" | "info";
+type Tone = "ok" | "muted" | "warn" | "default";
 const STATUS_TONE: Record<string, Tone> = {
-  "Đang hoạt động": "success",
-  "Đã đăng xuất": "neutral",
-  "Chưa ghi nhận đăng xuất": "warning",
-  "Có thể đã hết phiên": "info",
+  "Đang hoạt động": "ok",
+  "Đã đăng xuất": "muted",
+  "Chưa ghi nhận đăng xuất": "warn",
+  "Có thể đã hết phiên": "default",
 };
 
 const roleLabel = (s: LoginSession) => (s.is_super ? "Super Admin" : s.role === "admin" ? "Quản trị viên" : "Nhân viên");
 
-/** Lịch sử đăng nhập – chỉ Super Admin (GET /api/super/login-sessions, tối đa 500 phiên mới nhất). */
+/** Lịch sử đăng nhập – chỉ Super Admin (GET /api/super/login-sessions, tối đa 500 phiên mới nhất). Cột & thứ tự như admin.html. */
 export function LoginSessions() {
   const toast = useToast();
   const { data: rows, error, loading, reload } = useApiData<LoginSession[]>("/api/super/login-sessions");
@@ -51,93 +48,99 @@ export function LoginSessions() {
   const activeCount = useMemo(() => (rows ?? []).filter((r) => r.status === "Đang hoạt động").length, [rows]);
 
   return (
-    <Card>
-      <CardHeader
-        icon={MonitorSmartphone}
+    <OgCard>
+      <OgCardTitle
         title="Lịch sử đăng nhập tài khoản"
-        description={
-          rows ? `${rows.length} phiên gần nhất · ${activeCount} đang hoạt động. Chỉ Super Admin xem được.` : "Chỉ Super Admin xem được."
+        help={
+          <>
+            Chỉ Super Admin xem được. Dữ liệu ghi nhận từ thời điểm cập nhật phiên bản này.
+            {rows ? (
+              <>
+                {" "}
+                · <b className="font-semibold text-[#1e293b]">{rows.length}</b> phiên gần nhất, <b className="font-semibold text-[#16794b]">{activeCount}</b> đang
+                hoạt động.
+              </>
+            ) : null}
+          </>
         }
         actions={
-          <Button variant="secondary" size="sm" icon={RefreshCw} loading={loading} onClick={load}>
+          <OgButton loading={loading} onClick={load}>
             Làm mới
-          </Button>
+          </OgButton>
         }
+        className="mb-3.5!"
       />
-      <div className="grid gap-2 border-b border-line px-4 py-3 sm:grid-cols-[minmax(0,1fr)_200px_200px] sm:px-5">
-        <SearchInput placeholder="Tìm tài khoản, IP, thiết bị…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <Select value={user} onChange={(e) => setUser(e.target.value)} aria-label="Lọc theo người dùng">
+
+      <div className="mb-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_200px_200px]">
+        <input type="search" className={cn(ogInput, "min-h-10!")} placeholder="Tìm tài khoản, IP, thiết bị…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <select className={cn(ogInput, "min-h-10!")} value={user} onChange={(e) => setUser(e.target.value)} aria-label="Lọc theo người dùng">
           <option value="">Tất cả người dùng</option>
           {users.map(([u, name]) => (
             <option key={u} value={u}>
               {name === u ? u : `${name} (${u})`}
             </option>
           ))}
-        </Select>
-        <Select value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Lọc theo trạng thái">
+        </select>
+        <select className={cn(ogInput, "min-h-10!")} value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Lọc theo trạng thái">
           <option value="">Mọi trạng thái</option>
           {Object.keys(STATUS_TONE).map((s) => (
             <option key={s} value={s}>
               {s}
             </option>
           ))}
-        </Select>
+        </select>
       </div>
 
-      {error && !rows ? (
-        <p className="px-5 py-8 text-center text-sm text-danger-600">{error}</p>
-      ) : !rows ? (
-        <Spinner />
-      ) : !filtered.length ? (
-        <EmptyState
-          icon={MonitorSmartphone}
-          title={rows.length ? "Không có phiên phù hợp bộ lọc" : "Chưa có dữ liệu đăng nhập"}
-          description={rows.length ? undefined : "Dữ liệu được ghi nhận kể từ khi bật theo dõi phiên đăng nhập."}
-        />
-      ) : (
-        <Table maxHeight="70vh">
-          <THead>
-            <tr>
-              <Th>Tài khoản</Th>
-              <Th>Quyền</Th>
-              <Th>Đăng nhập lúc</Th>
-              <Th>Hoạt động gần nhất</Th>
-              <Th>Đăng xuất lúc</Th>
-              <Th>Trạng thái</Th>
-              <Th>IP</Th>
-              <Th>Thiết bị / Trình duyệt</Th>
-            </tr>
-          </THead>
-          <tbody>
-            {filtered.map((r) => (
-              <Tr key={r.id}>
-                <Td>
-                  <p className="font-medium">{r.full_name || r.username}</p>
-                  <p className="text-xs text-muted">@{r.username}</p>
-                </Td>
-                <Td className="text-muted">{roleLabel(r)}</Td>
-                <Td className="num whitespace-nowrap">{fmtDateTime(r.login_at)}</Td>
-                <Td className="whitespace-nowrap">
-                  <span className="num">{fmtDateTime(r.last_seen_at)}</span>
-                  {r.last_seen_at ? <p className="text-xs text-muted">{fmtRelative(r.last_seen_at)}</p> : null}
-                </Td>
-                <Td className="num whitespace-nowrap text-muted">{fmtDateTime(r.logout_at)}</Td>
-                <Td>
-                  <Badge tone={STATUS_TONE[r.status] ?? "neutral"} dot>
-                    {r.status || "—"}
-                  </Badge>
-                </Td>
-                <Td className="num font-mono text-xs">{r.ip_address || "—"}</Td>
-                <Td className="max-w-[260px]">
+      <OgTable maxHeight="70vh" minWidth={1000}>
+        <thead>
+          <tr>
+            <OgTh>Tài khoản</OgTh>
+            <OgTh>Quyền</OgTh>
+            <OgTh>Đăng nhập lúc</OgTh>
+            <OgTh>Hoạt động gần nhất</OgTh>
+            <OgTh>Đăng xuất lúc</OgTh>
+            <OgTh>Trạng thái</OgTh>
+            <OgTh>IP</OgTh>
+            <OgTh>Thiết bị / Trình duyệt</OgTh>
+          </tr>
+        </thead>
+        <tbody>
+          {error && !rows ? (
+            <OgEmptyRow colSpan={8} tone="error">
+              {error}
+            </OgEmptyRow>
+          ) : !rows ? (
+            <OgEmptyRow colSpan={8}>Đang tải...</OgEmptyRow>
+          ) : !filtered.length ? (
+            <OgEmptyRow colSpan={8}>{rows.length ? "Không có phiên phù hợp bộ lọc." : "Chưa có dữ liệu đăng nhập kể từ khi bật theo dõi."}</OgEmptyRow>
+          ) : (
+            filtered.map((r) => (
+              <OgTr key={r.id}>
+                <OgTd>
+                  <p className="font-semibold">{r.full_name || r.username}</p>
+                  <p className="text-xs text-[#64748b]">({r.username})</p>
+                </OgTd>
+                <OgTd className="whitespace-nowrap">{roleLabel(r)}</OgTd>
+                <OgTd className="num whitespace-nowrap">{fmtDateTime(r.login_at, "-")}</OgTd>
+                <OgTd className="whitespace-nowrap">
+                  <span className="num">{fmtDateTime(r.last_seen_at, "-")}</span>
+                  {r.last_seen_at ? <p className="text-xs text-[#64748b]">{fmtRelative(r.last_seen_at)}</p> : null}
+                </OgTd>
+                <OgTd className="num whitespace-nowrap text-[#475569]">{fmtDateTime(r.logout_at, "-")}</OgTd>
+                <OgTd>
+                  <OgPill tone={STATUS_TONE[r.status] ?? "muted"}>{r.status || "-"}</OgPill>
+                </OgTd>
+                <OgTd className="num font-mono text-xs whitespace-nowrap">{r.ip_address || "-"}</OgTd>
+                <OgTd className="max-w-[280px]">
                   <span title={r.user_agent || undefined} className="block truncate text-[13px]">
                     {shortUserAgent(r.user_agent)}
                   </span>
-                </Td>
-              </Tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
-    </Card>
+                </OgTd>
+              </OgTr>
+            ))
+          )}
+        </tbody>
+      </OgTable>
+    </OgCard>
   );
 }

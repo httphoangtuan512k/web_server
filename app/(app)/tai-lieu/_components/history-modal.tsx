@@ -3,11 +3,12 @@
 import { History } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
+import { cn } from "@/lib/cn";
 import { fmtDateTime } from "@/lib/format";
-import { Button } from "@/components/ui/button";
 import { EmptyState, Spinner } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { Table, THead, Td, Th, Tr } from "@/components/ui/table";
+import { tlBtn } from "./tl-ui";
 import type { DocHistoryItem, DocumentFile } from "./types";
 
 export function HistoryModal({ doc, onClose }: { doc: DocumentFile; onClose: () => void }) {
@@ -33,9 +34,9 @@ export function HistoryModal({ doc, onClose }: { doc: DocumentFile; onClose: () 
       title="Lịch sử hoạt động"
       description={doc.original_name}
       footer={
-        <Button variant="secondary" onClick={onClose}>
+        <button type="button" className={cn(tlBtn.base, tlBtn.md, tlBtn.gray)} onClick={onClose}>
           Đóng
-        </Button>
+        </button>
       }
     >
       {!items ? (

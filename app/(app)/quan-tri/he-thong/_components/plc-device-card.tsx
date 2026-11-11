@@ -1,50 +1,30 @@
 "use client";
 
-import { Cable, Check, Copy, EyeOff, KeyRound, PlugZap, RefreshCw, ShieldAlert } from "lucide-react";
+import { PlugZap } from "lucide-react";
 import { useState } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { fmtDateTime, fmtRelative } from "@/lib/format";
-import { Button } from "@/components/ui/button";
-import { Badge, Card, CardHeader, Spinner } from "@/components/ui/card";
 import { useConfirm } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
-import { Callout } from "../../_shared/callout";
+import { OgButton, OgCard, OgCardTitle, ogInput, OgPill } from "../../_shared/og-button";
 import { useApiData } from "../../_shared/use-api-data";
 import { useVisibleInterval } from "../../_shared/use-visible-interval";
 import { copyText } from "../../_shared/utils";
 import type { PlcDeviceStatus, PlcKeyResponse } from "./types";
 
-function ConnectionBadge({ s }: { s: PlcDeviceStatus }) {
-  if (s.connected)
-    return (
-      <Badge tone="success" dot>
-        Online
-      </Badge>
-    );
-  if (s.last_received_at)
-    return (
-      <Badge tone="danger" dot>
-        Mất kết nối
-      </Badge>
-    );
-  return (
-    <Badge tone="neutral" dot>
-      Chưa kết nối
-    </Badge>
-  );
-}
+const connText = (s: PlcDeviceStatus) => (s.connected ? "Online" : s.last_received_at ? "Mất kết nối" : "Chưa kết nối");
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-4 py-2.5">
-      <dt className="text-[13px] text-muted">{label}</dt>
-      <dd className="text-right text-sm text-fg">{children}</dd>
+    <div className="flex min-w-0 items-start justify-between gap-4 border-b border-[#edf0f4] py-2.5 last:border-b-0">
+      <dt className="shrink-0 text-[13px] text-[#64748b]">{label}</dt>
+      <dd className="min-w-0 text-right text-sm break-words text-[#1e293b]">{children}</dd>
     </div>
   );
 }
 
-/** Quản lý API Key cho phần mềm C# trên máy B (chỉ Super Admin). */
+/** "Quản lý kết nối PLC – Máy B" như admin.html cũ: cấp / thu hồi API Key cho phần mềm C# (chỉ Super Admin). */
 export function PlcDeviceCard() {
   const toast = useToast();
   const confirm = useConfirm();
@@ -110,53 +90,61 @@ export function PlcDeviceCard() {
   }
 
   return (
-    <Card className="flex flex-col">
-      <CardHeader
-        icon={Cable}
-        title="Kết nối PLC – Máy B"
-        description="Cấp API Key cho phần mềm C# trên máy B để gửi dữ liệu PLC lên hệ thống."
+    <OgCard>
+      <OgCardTitle
+        title="Quản lý kết nối PLC – Máy B"
+        help="Cấp API Key cho phần mềm C# trên máy B để gửi dữ liệu PLC lên SUPER WHITE."
         actions={
-          <Button
-            variant="ghost"
-            size="icon"
-            icon={RefreshCw}
+          <OgButton
+            size="sm"
             loading={loading && !s}
             onClick={async () => {
               const err = await reload();
               if (err) toast.error(err);
             }}
-            aria-label="Làm mới"
-            title="Làm mới"
-          />
+          >
+            Làm mới
+          </OgButton>
         }
       />
-      <div className="flex flex-1 flex-col gap-4 p-5">
-        {!s ? (
-          error ? (
-            <p className="py-6 text-center text-sm text-danger-600">{error}</p>
-          ) : (
-            <Spinner />
-          )
-        ) : (
-          <>
-            <div className="flex items-center gap-4 rounded-xl border border-line bg-surface-2 p-4">
+
+      {!s ? (
+        <p className={cn("rounded-lg border border-dashed border-[#dce3e9] px-4 py-6 text-center text-sm", error ? "text-[#b42318]" : "text-[#64748b]")}>
+          {error || "Đang tải trạng thái..."}
+        </p>
+      ) : (
+        <>
+          {/* Dòng trạng thái như trang cũ */}
+          <p className="mb-4 text-xs leading-relaxed text-[#64748b]">
+            {s.key_active
+              ? `API Key đang hoạt động. Tạo lúc: ${fmtDateTime(s.key_created_at, "Không rõ")} · Trạng thái máy B: ${connText(s)}${
+                  s.last_received_at ? ` · Nhận dữ liệu cuối: ${fmtDateTime(s.last_received_at)}` : ""
+                }`
+              : "Chưa có API Key hoạt động. Hãy tạo khóa cho máy B."}
+          </p>
+
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
+            <div className="flex items-center gap-4 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4">
               <span
                 className={cn(
-                  "grid h-11 w-11 shrink-0 place-items-center rounded-xl",
-                  s.connected ? "bg-success-50 text-success-600" : s.last_received_at ? "bg-danger-50 text-danger-600" : "bg-surface-3 text-subtle",
+                  "grid h-12 w-12 shrink-0 place-items-center rounded-full",
+                  s.connected ? "bg-[#ecfdf3] text-[#16794b]" : s.last_received_at ? "bg-[#fce8e6] text-[#b42318]" : "bg-[#eef2f7] text-[#64748b]",
                 )}
               >
-                <PlugZap size={20} />
+                <PlugZap size={22} />
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-semibold">{s.device_id || "MAY_B"}</p>
-                  <ConnectionBadge s={s} />
+                  <p className="font-bold">{s.device_id || "MAY_B"}</p>
+                  <OgPill tone={s.connected ? "ok" : s.last_received_at ? "off" : "muted"}>
+                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                    {connText(s)}
+                  </OgPill>
                 </div>
-                <p className="mt-0.5 text-[13px] text-muted">
+                <p className="mt-1 text-[13px] text-[#64748b]">
                   {s.last_received_at ? (
                     <>
-                      Nhận dữ liệu cuối <span className="font-medium text-fg">{fmtRelative(s.last_received_at)}</span>
+                      Nhận dữ liệu cuối <b className="font-semibold text-[#1e293b]">{fmtRelative(s.last_received_at)}</b>
                       <span className="num"> · {fmtDateTime(s.last_received_at)}</span>
                     </>
                   ) : (
@@ -166,15 +154,9 @@ export function PlcDeviceCard() {
               </div>
             </div>
 
-            <dl className="divide-y divide-line">
+            <dl className="rounded-lg border border-[#e2e8f0] px-4 py-1">
               <Row label="API Key">
-                {s.key_active ? (
-                  <Badge tone="success">Đang hoạt động</Badge>
-                ) : s.key_revoked_at ? (
-                  <Badge tone="danger">Đã thu hồi</Badge>
-                ) : (
-                  <Badge tone="neutral">Chưa tạo</Badge>
-                )}
+                {s.key_active ? <OgPill tone="ok">Đang hoạt động</OgPill> : s.key_revoked_at ? <OgPill tone="off">Đã thu hồi</OgPill> : <OgPill tone="muted">Chưa tạo</OgPill>}
               </Row>
               {s.key_active ? (
                 <Row label="Tạo lúc">
@@ -185,62 +167,47 @@ export function PlcDeviceCard() {
                   <span className="num">{fmtDateTime(s.key_revoked_at)}</span>
                 </Row>
               ) : null}
-              <Row label="Endpoint nhận dữ liệu">
-                <code className="rounded bg-surface-3 px-1.5 py-0.5 font-mono text-xs">POST /api/plc/telemetry</code>
-              </Row>
               <Row label="Header xác thực">
-                <code className="rounded bg-surface-3 px-1.5 py-0.5 font-mono text-xs">x-api-key</code>
+                <code className="rounded bg-[#eef2f7] px-1.5 py-0.5 font-mono text-xs">x-api-key</code>
               </Row>
-              <Row label="Chu kỳ gửi dự kiến">1 giây</Row>
             </dl>
+          </div>
 
-            {!s.key_active && !newKey ? (
-              <Callout tone="info">Chưa có API Key hoạt động. Hãy tạo khóa cho máy B.</Callout>
-            ) : null}
-
-            {newKey ? (
-              <div className="rounded-xl border border-warning-600/40 bg-warning-50 p-4">
-                <div className="flex items-start gap-3">
-                  <ShieldAlert size={18} className="mt-0.5 shrink-0 text-warning-600" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-fg">API Key mới – chỉ hiển thị lần này</p>
-                    <p className="mt-0.5 text-[13px] text-muted">
-                      Hãy sao chép và lưu vào phần mềm C#. Nếu đóng hoặc tải lại trang, khóa sẽ không hiển thị lại.
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                  <input
-                    readOnly
-                    value={newKey.api_key}
-                    onFocus={(e) => e.currentTarget.select()}
-                    autoComplete="off"
-                    spellCheck={false}
-                    aria-label="API Key mới"
-                    className="h-10 min-w-0 flex-1 rounded-[10px] border border-line-strong bg-surface px-3 font-mono text-[13px] text-fg focus:border-brand-500 focus:ring-3 focus:ring-brand-500/15 focus:outline-none"
-                  />
-                  <Button variant={copied ? "success" : "primary"} icon={copied ? Check : Copy} onClick={copy}>
-                    {copied ? "Đã sao chép" : "Sao chép"}
-                  </Button>
-                </div>
-                <div className="mt-2 flex justify-end">
-                  <Button variant="ghost" size="sm" icon={EyeOff} onClick={() => setNewKey(null)}>
-                    Tôi đã lưu, ẩn khóa
-                  </Button>
-                </div>
+          {newKey ? (
+            <div className="mt-4 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-4">
+              <strong className="text-sm">API Key mới – chỉ hiển thị lần này</strong>
+              <p className="mt-1 text-xs text-[#64748b]">Hãy sao chép và lưu vào phần mềm C#. Nếu đóng hoặc tải lại trang, khóa sẽ không hiển thị lại.</p>
+              <input
+                readOnly
+                value={newKey.api_key}
+                onFocus={(e) => e.currentTarget.select()}
+                autoComplete="off"
+                spellCheck={false}
+                aria-label="API Key mới"
+                className={cn(ogInput, "mt-3 font-mono text-[13px]")}
+              />
+              <div className="mt-3 flex flex-wrap gap-2">
+                <OgButton variant={copied ? "success" : "default"} onClick={copy}>
+                  {copied ? "✔ Đã sao chép" : "Sao chép API Key"}
+                </OgButton>
+                <OgButton onClick={() => setNewKey(null)}>Tôi đã lưu, ẩn khóa</OgButton>
               </div>
-            ) : null}
-          </>
-        )}
-      </div>
-      <div className="flex flex-wrap justify-end gap-2 border-t border-line bg-surface-2 px-5 py-3">
-        <Button variant="secondary" className="hover:text-danger-600" icon={KeyRound} disabled={!s?.key_active || !!busy} loading={busy === "revoke"} onClick={revokeKey}>
+            </div>
+          ) : null}
+        </>
+      )}
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <OgButton variant="primary" disabled={!s || !!busy} loading={busy === "create"} onClick={createKey}>
+          Tạo / Cấp lại API Key
+        </OgButton>
+        <OgButton variant="danger" disabled={!s?.key_active || !!busy} loading={busy === "revoke"} onClick={revokeKey}>
           Thu hồi API Key
-        </Button>
-        <Button icon={KeyRound} disabled={!s || !!busy} loading={busy === "create"} onClick={createKey}>
-          {s?.key_active ? "Cấp lại API Key" : "Tạo API Key"}
-        </Button>
+        </OgButton>
       </div>
-    </Card>
+      <p className="mt-3 text-xs text-[#64748b]">
+        Thiết bị: {s?.device_id || "MAY_B"} · API nhận dữ liệu: <code className="font-mono">/api/plc/telemetry</code> · Chu kỳ dự kiến: 1 giây.
+      </p>
+    </OgCard>
   );
 }

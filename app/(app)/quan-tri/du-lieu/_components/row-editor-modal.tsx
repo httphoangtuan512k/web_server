@@ -1,14 +1,14 @@
 "use client";
 
-import { KeyRound, Save, TriangleAlert } from "lucide-react";
+import { KeyRound, TriangleAlert } from "lucide-react";
 import { useMemo, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/card";
 import { Checkbox, Input, Textarea } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
+import { OgButton } from "../../_shared/og-button";
 import { fromFormValue, isImageValue, kindOf, labelOf, toFormValue } from "./columns";
 import type { CellValue, ColumnKind, SuperColumn, SuperRow, SuperTableData } from "./types";
 
@@ -63,7 +63,7 @@ export function RowEditorModal({ data, row, onClose, onSaved }: { data: SuperTab
       open
       onClose={onClose}
       size="xl"
-      title={`Sửa bản ghi · ${data.label}`}
+      title={`Sửa dữ liệu · ${data.label}`}
       description={
         <span className="font-mono text-xs">
           {data.table} · khóa {JSON.stringify(row.key)}
@@ -80,12 +80,12 @@ export function RowEditorModal({ data, row, onClose, onSaved }: { data: SuperTab
               "Chưa có thay đổi"
             )}
           </p>
-          <Button variant="secondary" onClick={onClose} disabled={saving}>
+          <OgButton variant="soft" className="rounded-lg!" onClick={onClose} disabled={saving}>
             Hủy
-          </Button>
-          <Button icon={Save} loading={saving} onClick={save} disabled={!changed.length}>
+          </OgButton>
+          <OgButton variant="blue" className="rounded-lg!" loading={saving} onClick={save} disabled={!changed.length}>
             Lưu thay đổi
-          </Button>
+          </OgButton>
         </>
       }
     >

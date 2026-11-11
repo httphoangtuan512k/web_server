@@ -1,20 +1,21 @@
 "use client";
 
-import { AlertCircle, CheckCircle2, ClipboardList, Factory, FilePlus2, FileSpreadsheet, History, Layers, Plus, Printer, RefreshCw } from "lucide-react";
+import { AlertCircle, ClipboardList, History, Printer, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { cn } from "@/lib/cn";
 import { fmtDateTime, fmtTime, todayKey } from "@/lib/format";
 import { PageGuard } from "@/components/shell/page-guard";
-import { Button } from "@/components/ui/button";
-import { Card, EmptyState, PageHeader, Skeleton, StatCard } from "@/components/ui/card";
+import { PageBody, PageTopbar, TopbarButton } from "@/components/shell/page-topbar";
+import { EmptyState, Skeleton } from "@/components/ui/card";
 import { useToast } from "@/components/ui/toast";
 import { HistoryModal } from "./history-modal";
 import { ImageViewer } from "./image-viewer";
 import { useOrderOperations, type OrderActionKind } from "./order-actions";
+import { BTN_PRIMARY, BTN_SECONDARY } from "./order-bits";
 import { OrderDetailModal } from "./order-detail-modal";
-import { EMPTY_FILTERS, OrderFilters, type Filters } from "./order-filters";
+import { EMPTY_FILTERS, OrderToolbar, StatusTabs, type Filters } from "./order-filters";
 import { OrderFormModal } from "./order-form-modal";
 import { OrderList } from "./order-list";
 import type { Order, OrderGroup, OrderPerms, StatusFilter } from "./types";
@@ -156,121 +157,141 @@ function KeHoach() {
   }
 
   const loading = !data && !error;
+  const openHistory = () => setHistory({ query: "" });
 
   return (
-    <>
-      <div className="no-print">
-        <PageHeader
-          title="Kế hoạch sản xuất"
-          description={
-            <span className="inline-flex flex-wrap items-center gap-x-2">
-              Tạo, theo dõi và xác nhận đơn hàng sản xuất.
-              {loadedAt ? (
-                <span className="inline-flex items-center gap-1 text-xs text-subtle">
-                  <span className={cn("h-1.5 w-1.5 rounded-full", error ? "bg-danger-600" : "bg-success-600")} />
-                  Cập nhật {fmtTime(loadedAt)} · tự làm mới mỗi 30 giây
-                </span>
-              ) : null}
+    <div className="min-h-dvh bg-[#eef2f6] text-[#202832]">
+      <PageTopbar
+        title="Kế hoạch sản xuất"
+        color="#173e66"
+        subtitle={
+          loadedAt ? (
+            <span className="inline-flex items-center gap-1.5">
+              <span className={cn("h-1.5 w-1.5 rounded-full", error ? "bg-red-400" : "bg-emerald-400")} />
+              Cập nhật {fmtTime(loadedAt)}
+              <span className="hidden sm:inline">· tự làm mới mỗi 30 giây</span>
+            </span>
+          ) : undefined
+        }
+        actions={
+          <span className="hidden sm:contents">
+            <TopbarButton onClick={reload} disabled={refreshing} title="Làm mới" aria-label="Làm mới">
+              <RefreshCw size={15} className={cn(refreshing && "animate-spin")} />
+            </TopbarButton>
+            <TopbarButton onClick={openHistory} title="Lịch sử thao tác">
+              <History size={15} />
+              Lịch sử
+            </TopbarButton>
+            <TopbarButton onClick={() => window.print()} title="In danh sách">
+              <Printer size={15} />
+              In
+            </TopbarButton>
+          </span>
+        }
+      />
+
+      <PageBody className="print:p-0">
+        {/* Tiêu đề khi in */}
+        <div className="mb-4 hidden print:block">
+          <h1 className="text-xl font-semibold">Kế hoạch sản xuất – SUPER WHITE</h1>
+          <p className="text-sm">
+            In lúc {fmtDateTime(loadedAt || undefined)} · {shown.length} đơn
+          </p>
+        </div>
+
+        <section className="no-print mb-3 grid grid-cols-2 gap-2.5 sm:mb-4 md:grid-cols-4 md:gap-3">
+          <Stat label="Tổng đơn đang hiển thị" value={counts.all} loading={loading} accent="bg-[#173e66]" hint={`Kế hoạch ${fmtTons(totals.planned)} tấn`} />
+          <Stat label="Đơn mới tạo" value={counts.new} loading={loading} accent="bg-white ring-1 ring-inset ring-[#9ba8b4]" hint="Chưa chạy máy" />
+          <Stat
+            label="Đơn đang chạy"
+            value={counts.running + counts.paused}
+            loading={loading}
+            accent="bg-[#ffd23f]"
+            hint={`${counts.paused} tạm dừng · còn ${fmtTons(totals.remaining)} tấn`}
+          />
+          <Stat label="Đã chạy" value={counts.completed} loading={loading} accent="bg-[#70ca7a]" hint={`Sản lượng ${fmtTons(totals.doneTons)} tấn`} />
+        </section>
+
+        <OrderToolbar
+          value={{ ...filters, month }}
+          onChange={setFilters}
+          months={months}
+          canCreate={perms.create}
+          onCreate={() => setForm({ order: null })}
+          onExport={exportExcel}
+          exporting={exporting}
+          extra={
+            <span className="contents sm:hidden">
+              {[
+                { label: "Lịch sử thao tác", icon: History, onClick: openHistory },
+                { label: "In danh sách", icon: Printer, onClick: () => window.print() },
+                { label: "Làm mới", icon: RefreshCw, onClick: reload, spin: refreshing },
+              ].map(({ label, icon: Icon, onClick, spin }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={onClick}
+                  disabled={spin}
+                  aria-label={label}
+                  title={label}
+                  className="grid h-[38px] w-[38px] shrink-0 place-items-center rounded-lg border border-[#c3cdd6] bg-white text-[#334155] transition hover:bg-[#eef2f6] active:scale-95 disabled:opacity-60"
+                >
+                  <Icon size={16} className={cn(spin && "animate-spin")} />
+                </button>
+              ))}
             </span>
           }
-          actions={
-            <>
-              <Button variant="ghost" size="icon" icon={RefreshCw} onClick={reload} loading={refreshing} aria-label="Làm mới" title="Làm mới" />
-              <Button variant="secondary" icon={History} onClick={() => setHistory({ query: "" })} title="Lịch sử thao tác">
-                <span className="hidden sm:inline">Lịch sử</span>
-              </Button>
-              <Button variant="secondary" icon={Printer} onClick={() => window.print()} title="In danh sách">
-                <span className="hidden sm:inline">In</span>
-              </Button>
-              <Button variant="secondary" icon={FileSpreadsheet} onClick={exportExcel} loading={exporting} title="Xuất Excel">
-                <span className="hidden sm:inline">Xuất Excel</span>
-              </Button>
-              {perms.create ? (
-                <Button icon={Plus} onClick={() => setForm({ order: null })}>
-                  Tạo đơn
-                </Button>
-              ) : null}
-            </>
-          }
         />
-      </div>
 
-      {/* Tiêu đề khi in */}
-      <div className="mb-4 hidden print:block">
-        <h1 className="text-xl font-semibold">Kế hoạch sản xuất – SUPER WHITE</h1>
-        <p className="text-sm">
-          In lúc {fmtDateTime(loadedAt || undefined)} · {shown.length} đơn
-        </p>
-      </div>
-
-      <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-        {loading ? (
-          Array.from({ length: 4 }, (_, i) => <Skeleton key={i} className="h-[104px] rounded-[var(--radius-card)]" />)
-        ) : (
-          <>
-            <StatCard label="Tổng đơn đang hiển thị" value={counts.all} icon={Layers} tone="accent" hint={`Kế hoạch ${fmtTons(totals.planned)} tấn`} />
-            <StatCard label="Chưa chạy" value={counts.new} icon={FilePlus2} tone="brand" hint="Đơn mới, chờ chạy máy" />
-            <StatCard
-              label="Đơn đang chạy"
-              value={counts.running + counts.paused}
-              icon={Factory}
-              tone="warning"
-              hint={`${counts.paused} tạm dừng · còn ${fmtTons(totals.remaining)} tấn`}
+        <section className="overflow-hidden rounded-xl border border-[#c3cdd6] bg-white shadow-[0_2px_10px_rgba(15,23,42,0.05)] print:rounded-none print:border-0 print:shadow-none">
+          {data ? <StatusTabs value={filters.status} onChange={(v) => setFilters((f) => ({ ...f, status: v }))} counts={counts} /> : null}
+          {loading ? (
+            <div className="space-y-2 p-4">
+              {Array.from({ length: 6 }, (_, i) => (
+                <Skeleton key={i} className="h-14" />
+              ))}
+            </div>
+          ) : !data ? (
+            <EmptyState
+              icon={AlertCircle}
+              title="Không tải được danh sách đơn hàng"
+              description={error ?? undefined}
+              action={
+                <button type="button" onClick={reload} disabled={refreshing} className={BTN_SECONDARY}>
+                  <RefreshCw size={15} className={cn(refreshing && "animate-spin")} />
+                  Thử lại
+                </button>
+              }
             />
-            <StatCard label="Đã hoàn thành" value={counts.completed} icon={CheckCircle2} tone="success" hint={`Sản lượng ${fmtTons(totals.doneTons)} tấn`} />
-          </>
-        )}
-      </div>
-
-      <Card className="overflow-hidden">
-        <div className="no-print">
-          <OrderFilters value={{ ...filters, month }} onChange={setFilters} months={months} counts={counts} />
-        </div>
-        {loading ? (
-          <div className="space-y-2 p-4">
-            {Array.from({ length: 6 }, (_, i) => (
-              <Skeleton key={i} className="h-14" />
-            ))}
-          </div>
-        ) : !data ? (
-          <EmptyState
-            icon={AlertCircle}
-            title="Không tải được danh sách đơn hàng"
-            description={error ?? undefined}
-            action={
-              <Button variant="secondary" icon={RefreshCw} onClick={reload} loading={refreshing}>
-                Thử lại
-              </Button>
-            }
-          />
-        ) : shown.length === 0 ? (
-          <EmptyState
-            icon={ClipboardList}
-            title="Không có đơn hàng nào phù hợp."
-            description={orders.length ? "Thử đổi bộ lọc hoặc từ khóa tìm kiếm." : "Chưa có đơn hàng nào trong hệ thống."}
-            action={
-              orders.length ? (
-                <Button variant="secondary" onClick={() => setFilters(EMPTY_FILTERS)}>
-                  Xóa lọc
-                </Button>
-              ) : perms.create ? (
-                <Button icon={Plus} onClick={() => setForm({ order: null })}>
-                  Tạo đơn
-                </Button>
-              ) : undefined
-            }
-          />
-        ) : (
-          <OrderList
-            groups={shown}
-            perms={perms}
-            pending={pending}
-            onOpen={(g) => setDetailKey(g.key)}
-            onAction={onAction}
-            onOpenImage={(src, title) => setImage({ src, title })}
-          />
-        )}
-      </Card>
+          ) : shown.length === 0 ? (
+            <EmptyState
+              icon={ClipboardList}
+              title="Không có đơn hàng nào phù hợp."
+              description={orders.length ? "Thử đổi bộ lọc hoặc từ khóa tìm kiếm." : "Chưa có đơn hàng nào trong hệ thống."}
+              action={
+                orders.length ? (
+                  <button type="button" onClick={() => setFilters(EMPTY_FILTERS)} className={BTN_SECONDARY}>
+                    Xóa lọc
+                  </button>
+                ) : perms.create ? (
+                  <button type="button" onClick={() => setForm({ order: null })} className={BTN_PRIMARY}>
+                    + Tạo đơn
+                  </button>
+                ) : undefined
+              }
+            />
+          ) : (
+            <OrderList
+              groups={shown}
+              perms={perms}
+              pending={pending}
+              onOpen={(g) => setDetailKey(g.key)}
+              onAction={onAction}
+              onOpenImage={(src, title) => setImage({ src, title })}
+            />
+          )}
+        </section>
+      </PageBody>
 
       {detail ? (
         <OrderDetailModal
@@ -289,6 +310,22 @@ function KeHoach() {
       {history ? <HistoryModal initialQuery={history.query} isSuper={perms.isSuper} onClose={() => setHistory(null)} /> : null}
       {image ? <ImageViewer src={image.src} title={image.title} onClose={() => setImage(null)} /> : null}
       {dialog}
-    </>
+    </div>
+  );
+}
+
+/** Ô thống kê như trang cũ (nhãn nhỏ + số lớn), dạng thẻ hiện đại; vạch màu = màu dòng tương ứng. */
+function Stat({ label, value, hint, accent, loading }: { label: string; value: number; hint?: string; accent: string; loading?: boolean }) {
+  return (
+    <div className="relative min-w-0 overflow-hidden rounded-xl border border-[#d3dbe3] bg-white px-3.5 py-3 shadow-[0_2px_10px_rgba(15,23,42,0.05)] transition hover:shadow-[0_6px_18px_rgba(15,23,42,0.08)] sm:px-4 sm:py-3.5">
+      <span className={cn("absolute inset-y-0 left-0 w-1.5", accent)} aria-hidden />
+      <p className="text-xs leading-snug font-medium text-[#475767] sm:text-[13px]">{label}</p>
+      {loading ? (
+        <Skeleton className="mt-2 h-7 w-12" />
+      ) : (
+        <p className="num mt-1 text-[24px] leading-tight font-bold text-[#202832] sm:text-[27px]">{value}</p>
+      )}
+      {hint && !loading ? <p className="mt-0.5 truncate text-[11px] text-[#64748b] sm:text-xs">{hint}</p> : null}
+    </div>
   );
 }

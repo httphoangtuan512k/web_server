@@ -1,11 +1,9 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { fmtDate } from "@/lib/format";
-import { Table, Td, Th, THead, Tr } from "@/components/ui/table";
 import { OrderActionButtons, type OrderActionKind } from "./order-actions";
-import { OrderThumb, ProductionProgress, StatusBadge } from "./order-bits";
+import { OrderThumb, ROW_BG, StatusText } from "./order-bits";
 import type { OrderGroup, OrderPerms } from "./types";
 import { fmtTons, statusKey } from "./utils";
 
@@ -18,27 +16,13 @@ interface ListProps {
   onOpenImage: (src: string, title: string) => void;
 }
 
-/**
- * Màu theo trạng thái (quy ước của xưởng):
- *  - Trắng : chưa chạy (mới tạo)
- *  - Vàng  : đang chạy (kể cả đang tạm dừng – đơn vẫn dở dang)
- *  - Xanh  : đã chạy xong (hoàn thành)
- */
-const rowTint = (g: OrderGroup) => {
-  const k = statusKey(g);
-  return k === "completed"
-    ? "bg-success-600/12 hover:bg-success-600/18"
-    : k === "running" || k === "paused"
-      ? "bg-yellow-400/25 hover:bg-yellow-400/35"
-      : "bg-surface";
-};
+/** Thông tin máy / người chạy (hiện khi rê chuột – trang cũ chỉ xem trong chi tiết). */
+const tip = (g: OrderGroup) =>
+  [g.orderNumber && `Đơn ${g.orderNumber}`, g.machineNames.length && `Máy: ${g.machineNames.join(", ")}`, g.runnerNames.length && `Người chạy: ${g.runnerNames.join(" + ")}`]
+    .filter(Boolean)
+    .join(" · ");
 
-const accent = (g: OrderGroup) => {
-  const k = statusKey(g);
-  return k === "completed" ? "bg-success-600" : k === "running" || k === "paused" ? "bg-yellow-500" : "bg-line-strong";
-};
-
-/** Danh sách đơn: bảng trên desktop (≥ md), thẻ trên điện thoại. Khi in luôn dùng bảng. */
+/** Danh sách đơn: bảng như trang cũ (≥ md, cuộn ngang trong khung nếu hẹp), thẻ trên điện thoại. Khi in luôn dùng bảng. */
 export function OrderList(props: ListProps) {
   return (
     <>
@@ -52,98 +36,104 @@ export function OrderList(props: ListProps) {
   );
 }
 
+/** Độ rộng cột theo trang cũ: 16 / 14 / 9 / 8 / 11 / 28 / 14 %. */
+const COLS = ["16%", "14%", "9%", "8%", "11%", "28%", "14%"];
+
+const th = "sticky top-0 z-[2] border-r border-[#60788f] bg-[#244c75] px-1.5 py-2.5 text-center text-xs font-bold text-white last:border-r-0";
+const td = "border-r border-b border-[#a2adb8]/70 px-1.5 py-2 text-center align-middle [overflow-wrap:anywhere] last:border-r-0";
+
 function OrderTable({ groups, perms, pending, onOpen, onAction, onOpenImage }: ListProps) {
   return (
-    <Table className="max-h-[calc(100dvh-220px)] min-h-40 print:max-h-none print:overflow-visible">
-      <THead>
-        <tr>
-          <Th className="w-16">Ảnh</Th>
-          <Th>Mã bao bì / Đơn hàng</Th>
-          <Th>Cỡ hạt</Th>
-          <Th align="right">Số lượng (tấn)</Th>
-          <Th className="min-w-44">Tiến độ sản lượng</Th>
-          <Th>Máy · Người chạy</Th>
-          <Th>Trạng thái</Th>
-          <Th>Ngày hoàn thành</Th>
-          <Th className="no-print">Thao tác</Th>
-        </tr>
-      </THead>
-      <tbody>
-        {groups.map((g) => (
-          <Tr key={g.key} onClick={() => onOpen(g)} className={rowTint(g)}>
-            <Td className="relative">
-              <span className={cn("absolute inset-y-1.5 left-0 w-1 rounded-r-full", accent(g))} aria-hidden />
-              <OrderThumb src={g.imageData} alt={`Đơn ${g.orderNumber}`} onOpen={() => onOpenImage(g.imageData, `Đơn ${g.orderNumber}`)} size="sm" />
-            </Td>
-            <Td className="max-w-64">
-              <p className="truncate font-semibold text-fg">{g.packagingCode || "—"}</p>
-              <p className="truncate text-xs text-muted">
-                Đơn {g.orderNumber || "—"} · {g.itemCode || "—"}
-              </p>
-            </Td>
-            <Td className="max-w-48">
-              <span className="line-clamp-2 text-[13px]">{g.grainSize || "—"}</span>
-            </Td>
-            <Td align="right" className="font-semibold">
-              {fmtTons(g.quantity)}
-            </Td>
-            <Td>
-              <ProductionProgress order={g} />
-            </Td>
-            <Td className="max-w-52 text-[13px]">
-              <p className="truncate text-fg">{g.machineNames.join(", ") || "—"}</p>
-              <p className="truncate text-xs text-muted">{g.runnerNames.join(" + ") || "—"}</p>
-            </Td>
-            <Td>
-              <StatusBadge order={g} />
-            </Td>
-            <Td className="num text-[13px] whitespace-nowrap text-muted">{fmtDate(g.completedAt)}</Td>
-            <Td className="no-print">
-              <OrderActionButtons group={g} perms={perms} onAction={onAction} pending={pending} compact className="flex-nowrap" />
-            </Td>
-          </Tr>
-        ))}
-      </tbody>
-    </Table>
+    <div className="max-h-[75vh] w-full overflow-auto overscroll-x-contain print:max-h-none print:overflow-visible">
+      <table className="w-full min-w-[980px] table-fixed border-separate border-spacing-0 text-[12.5px] text-[#202832] print:min-w-0">
+        <colgroup>
+          {COLS.map((w, i) => (
+            <col key={i} style={{ width: w }} />
+          ))}
+        </colgroup>
+        <thead>
+          <tr>
+            <th className={th}>Mã bao bì</th>
+            <th className={th}>Cỡ hạt</th>
+            <th className={th}>
+              Số lượng
+              <br />
+              (tấn)
+            </th>
+            <th className={th}>Hình ảnh</th>
+            <th className={th}>Trạng thái</th>
+            <th className={cn(th, "no-print")}>Thao tác</th>
+            <th className={th}>Ngày hoàn thành</th>
+          </tr>
+        </thead>
+        <tbody>
+          {groups.map((g) => (
+            <tr
+              key={g.key}
+              onClick={() => onOpen(g)}
+              title={tip(g)}
+              className={cn("cursor-pointer transition-[filter] hover:brightness-[0.96] [&:last-child>td]:border-b-0", ROW_BG[statusKey(g)])}
+            >
+              <td className={cn(td, "pl-3 text-left")}>
+                <p className="font-semibold">{g.packagingCode || "-"}</p>
+              </td>
+              <td className={cn(td, "pl-3 text-left")}>{g.grainSize || "-"}</td>
+              <td className={cn(td, "num font-semibold")}>{fmtTons(g.quantity)}</td>
+              <td className={td}>
+                <OrderThumb src={g.imageData} alt={`Đơn ${g.orderNumber}`} onOpen={() => onOpenImage(g.imageData, `Đơn ${g.orderNumber}`)} />
+              </td>
+              <td className={td}>
+                <StatusText order={g} />
+              </td>
+              <td className={cn(td, "no-print py-1.5")}>
+                <OrderActionButtons group={g} perms={perms} onAction={onAction} pending={pending} withView className="justify-center" />
+              </td>
+              <td className={cn(td, "num")}>{fmtDate(g.completedAt, "-")}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
+/** Điện thoại: mỗi đơn một thẻ cùng màu trạng thái, đủ thông tin cột & đủ nút như trang cũ. */
 function OrderCards({ groups, perms, pending, onOpen, onAction, onOpenImage }: ListProps) {
   return (
-    <ul className="divide-y divide-line">
+    <ul className="space-y-2.5 p-2.5">
       {groups.map((g) => (
-        <li key={g.key} className={cn("relative px-4 py-3.5", rowTint(g))}>
-          <span className={cn("absolute inset-y-3 left-0 w-1 rounded-r-full", accent(g))} aria-hidden />
-          <div className="flex items-start gap-3">
-            <OrderThumb src={g.imageData} alt={`Đơn ${g.orderNumber}`} onOpen={() => onOpenImage(g.imageData, `Đơn ${g.orderNumber}`)} />
+        <li
+          key={g.key}
+          className={cn("overflow-hidden rounded-xl border border-black/15 text-[#202832] shadow-[0_2px_8px_rgba(15,23,42,0.08)]", ROW_BG[statusKey(g)])}
+        >
+          <div className="flex min-w-0 items-start gap-3 px-3 pt-3">
+            <span className="grid h-10 w-[45px] shrink-0 place-items-center rounded bg-white/60">
+              <OrderThumb src={g.imageData} alt={`Đơn ${g.orderNumber}`} onOpen={() => onOpenImage(g.imageData, `Đơn ${g.orderNumber}`)} />
+            </span>
             <button
               type="button"
               onClick={() => onOpen(g)}
               className="flex min-w-0 flex-1 items-start gap-2 text-left"
               aria-label={`Xem chi tiết đơn ${g.orderNumber}`}
             >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="truncate font-semibold text-fg">{g.packagingCode || "—"}</p>
-                  <StatusBadge order={g} />
-                </div>
-                <p className="truncate text-xs text-muted">
-                  Đơn {g.orderNumber || "—"} · {g.itemCode || "—"}
-                </p>
-                <p className="mt-0.5 truncate text-xs text-muted">
-                  {g.grainSize || "—"} · <span className="num font-medium text-fg">{fmtTons(g.quantity)} tấn</span>
-                </p>
-              </div>
-              <ChevronRight size={18} className="mt-1 shrink-0 text-subtle" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-[14px] leading-snug font-bold break-words">{g.packagingCode || "-"}</span>
+                <span className="mt-0.5 block text-xs break-words text-black/65">{g.grainSize || "-"}</span>
+              </span>
+              <StatusText order={g} className="max-w-[48%] shrink-0 text-right text-xs" />
             </button>
           </div>
-          <ProductionProgress order={g} className="mt-3" />
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted">
-            {g.machineNames.length ? <span>Máy: {g.machineNames.join(", ")}</span> : null}
-            {g.runnerNames.length ? <span>Người chạy: {g.runnerNames.join(" + ")}</span> : null}
-            {g.completedAt ? <span>Hoàn thành: {fmtDate(g.completedAt)}</span> : null}
-          </div>
-          <OrderActionButtons group={g} perms={perms} onAction={onAction} pending={pending} compact hideEmpty className="mt-3" />
+          <dl className="mx-3 mt-2.5 grid grid-cols-2 gap-2 rounded-lg bg-white/55 px-2.5 py-2 text-xs">
+            <div className="min-w-0">
+              <dt className="text-[11px] text-black/60">Số lượng (tấn)</dt>
+              <dd className="num font-bold">{fmtTons(g.quantity)}</dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-[11px] text-black/60">Ngày hoàn thành</dt>
+              <dd className="num font-bold">{fmtDate(g.completedAt, "-")}</dd>
+            </div>
+          </dl>
+          <OrderActionButtons group={g} perms={perms} onAction={onAction} pending={pending} withView className="gap-1.5 px-3 pt-2.5 pb-3" />
         </li>
       ))}
     </ul>

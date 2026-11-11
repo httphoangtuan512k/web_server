@@ -1,44 +1,47 @@
 "use client";
 
-import { MonitorSmartphone, RefreshCw, ShieldCheck, UserCheck, UserPlus, Users, UserX } from "lucide-react";
-import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useMemo, useRef, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { Button } from "@/components/ui/button";
-import { Card, EmptyState, PageHeader, Spinner, StatCard } from "@/components/ui/card";
-import { SearchInput, Select } from "@/components/ui/form";
+import { cn } from "@/lib/cn";
 import { useConfirm } from "@/components/ui/modal";
-import { Tabs } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast";
 import { PageGuard } from "@/components/shell/page-guard";
+import { PageBody, PageTopbar, TopbarButton, TopbarLink } from "@/components/shell/page-topbar";
+import { OgButton, OgCard, OgCardTitle, OgEmptyBox, ogInput, OgScreen, topbarStack } from "../../_shared/og-button";
 import { useApiData } from "../../_shared/use-api-data";
 import { matchesQuery, normalizeText } from "../../_shared/utils";
+import { AccountForm } from "./account-form";
 import { LoginSessions } from "./login-sessions";
 import { PasswordModal } from "./password-modal";
 import type { UserAccount } from "./types";
-import { UserFormModal } from "./user-form-modal";
 import { UsersList, type UserActions } from "./users-list";
 
-type Tab = "accounts" | "sessions";
+/** Nút trên thanh tiêu đề trang Quản lý nhân sự: nền trắng chữ tối như admin.html cũ. */
+const whiteTopbarBtn = "max-sm:px-2.5! max-sm:text-[13px]! border-[#cbd5e1]! bg-white! font-normal! text-[#1e293b]! hover:bg-[#edf2f6]!";
 
 export function UsersPage() {
   return (
-    <PageGuard role="admin">
-      <UsersContent />
-    </PageGuard>
+    <OgScreen>
+      <PageGuard role="admin">
+        <UsersContent />
+      </PageGuard>
+    </OgScreen>
   );
 }
 
 function UsersContent() {
-  const { me } = useAuth();
+  const { me, logout } = useAuth();
   const toast = useToast();
   const confirm = useConfirm();
-  const [tab, setTab] = useState<Tab>("accounts");
   const { data: users, error, loading, reload } = useApiData<UserAccount[]>("/api/users");
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"" | "active" | "locked" | "admin" | "user">("");
-  const [form, setForm] = useState<{ user: UserAccount | null } | null>(null);
+  const [editing, setEditing] = useState<UserAccount | null>(null);
+  const [formKey, setFormKey] = useState(0);
   const [pwUser, setPwUser] = useState<UserAccount | null>(null);
+  const formRef = useRef<HTMLElement>(null);
 
   const load = async () => {
     const err = await reload();
@@ -66,8 +69,17 @@ function UsersContent() {
     });
   }, [users, q, filter]);
 
+  const resetForm = () => {
+    setEditing(null);
+    setFormKey((k) => k + 1);
+  };
+
   const actions: UserActions = {
-    onEdit: (u) => setForm({ user: u }),
+    onEdit: (u) => {
+      setEditing(u);
+      setFormKey((k) => k + 1);
+      requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    },
     onPassword: (u) => setPwUser(u),
     onToggleActive: async (u) => {
       if (u.active) {
@@ -103,6 +115,7 @@ function UsersContent() {
       try {
         await api.delete(`/api/users/${u.id}`);
         toast.success(`Đã xóa tài khoản ${u.username}.`);
+        if (editing?.id === u.id) resetForm();
         await load();
       } catch (e) {
         toast.error(errorMessage(e));
@@ -112,106 +125,110 @@ function UsersContent() {
 
   return (
     <>
-      <PageHeader
-        title="Người dùng"
-        description="Quản lý tài khoản, hồ sơ nhân viên và phân quyền truy cập."
-        actions={
-          tab === "accounts" ? (
-            <>
-              <Button variant="secondary" icon={RefreshCw} loading={loading} onClick={load} aria-label="Làm mới">
-                <span className="hidden sm:inline">Làm mới</span>
-              </Button>
-              <Button icon={UserPlus} onClick={() => setForm({ user: null })}>
-                Tạo tài khoản
-              </Button>
-            </>
-          ) : null
+      <PageTopbar
+        title="SUPER WHITE"
+        subtitle="QUẢN LÝ TÀI KHOẢN VÀ HỒ SƠ NHÂN VIÊN"
+        backHref={null}
+        className={topbarStack}
+                actions={
+          <>
+            <TopbarLink href="/" className={whiteTopbarBtn}>
+              ← Trang chủ
+            </TopbarLink>
+            {me?.isSuper ? (
+              <TopbarLink href="/quan-tri/du-lieu" className={whiteTopbarBtn}>
+                Chỉnh sửa dữ liệu
+              </TopbarLink>
+            ) : null}
+            <TopbarButton onClick={logout} className={whiteTopbarBtn}>
+              Đăng xuất
+            </TopbarButton>
+          </>
         }
       />
 
-      {me?.isSuper ? (
-        <Tabs<Tab>
-          className="mb-5"
-          value={tab}
-          onChange={setTab}
-          items={[
-            { value: "accounts", label: "Tài khoản", count: users?.length },
-            {
-              value: "sessions",
-              label: (
-                <span className="inline-flex items-center gap-1.5">
-                  <MonitorSmartphone size={14} /> Phiên đăng nhập
-                </span>
-              ),
-            },
-          ]}
+      <PageBody className="flex max-w-[1250px]! flex-col gap-4 sm:gap-5">
+        <AccountForm
+          key={`${editing?.id ?? "new"}-${formKey}`}
+          ref={formRef}
+          user={editing}
+          onCancel={resetForm}
+          onSaved={() => {
+            resetForm();
+            void load();
+          }}
         />
-      ) : null}
 
-      {tab === "sessions" && me?.isSuper ? (
-        <LoginSessions />
-      ) : (
-        <>
-          <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <StatCard label="Tổng tài khoản" value={users ? stats.total : "—"} icon={Users} />
-            <StatCard label="Đang hoạt động" value={users ? stats.active : "—"} icon={UserCheck} tone="success" />
-            <StatCard label="Đã khóa" value={users ? stats.locked : "—"} icon={UserX} tone="danger" />
-            <StatCard label="Quản trị viên" value={users ? stats.admins : "—"} icon={ShieldCheck} tone="accent" />
+        <OgCard>
+          <OgCardTitle
+            title="Danh sách tài khoản"
+            help={
+              users ? (
+                <>
+                  {stats.total} tài khoản · <span className="text-[#16794b]">{stats.active} hoạt động</span> ·{" "}
+                  <span className={cn(stats.locked && "text-[#b42318]")}>{stats.locked} đã khóa</span> · {stats.admins} quản trị viên. Tài khoản Super Admin
+                  không hiển thị và không thể chỉnh sửa tại đây.
+                </>
+              ) : null
+            }
+            actions={
+              <OgButton loading={loading} onClick={load}>
+                Làm mới
+              </OgButton>
+            }
+            className="mb-3.5!"
+          />
+          <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+            <input
+              type="search"
+              className={cn(ogInput, "min-h-10! sm:max-w-sm")}
+              placeholder="Tìm theo tên, tài khoản, chức danh…"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+            <select className={cn(ogInput, "min-h-10! sm:w-48")} value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} aria-label="Lọc tài khoản">
+              <option value="">Tất cả tài khoản</option>
+              <option value="active">Đang hoạt động</option>
+              <option value="locked">Đã khóa</option>
+              <option value="admin">Quản trị viên</option>
+              <option value="user">Nhân viên</option>
+            </select>
+            {users && filtered.length !== users.length ? (
+              <p className="text-[13px] text-[#64748b] sm:ml-auto">
+                Hiển thị <b className="text-[#1e293b]">{filtered.length}</b> / {users.length}
+              </p>
+            ) : null}
           </div>
 
-          <Card>
-            <div className="flex flex-col gap-2 border-b border-line px-4 py-3 sm:flex-row sm:items-center sm:px-5">
-              <SearchInput className="sm:max-w-sm sm:flex-1" placeholder="Tìm theo tên, tài khoản, chức danh…" value={q} onChange={(e) => setQ(e.target.value)} />
-              <Select className="sm:w-48" value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} aria-label="Lọc tài khoản">
-                <option value="">Tất cả tài khoản</option>
-                <option value="active">Đang hoạt động</option>
-                <option value="locked">Đã khóa</option>
-                <option value="admin">Quản trị viên</option>
-                <option value="user">Nhân viên</option>
-              </Select>
-              <p className="text-[13px] text-muted sm:ml-auto">
-                {users ? (
-                  <>
-                    Hiển thị <span className="num font-medium text-fg">{filtered.length}</span> / <span className="num">{users.length}</span>
-                  </>
-                ) : null}
-              </p>
-            </div>
-            {error && !users ? (
-              <EmptyState
-                icon={UserX}
-                title="Không tải được danh sách tài khoản"
-                description={error}
-                action={
-                  <Button variant="secondary" icon={RefreshCw} onClick={load}>
-                    Thử lại
-                  </Button>
-                }
-              />
-            ) : !users ? (
-              <Spinner />
-            ) : !filtered.length ? (
-              <EmptyState
-                icon={Users}
-                title={users.length ? "Không có tài khoản phù hợp" : "Chưa có tài khoản"}
-                description={users.length ? "Thử đổi từ khóa hoặc bộ lọc." : "Tạo tài khoản đầu tiên cho nhân viên."}
-                action={
-                  users.length ? undefined : (
-                    <Button icon={UserPlus} onClick={() => setForm({ user: null })}>
-                      Tạo tài khoản
-                    </Button>
-                  )
-                }
-              />
-            ) : (
-              <UsersList users={filtered} meId={me?.id} actions={actions} />
-            )}
-          </Card>
-          <p className="mt-3 text-xs text-muted">Tài khoản Super Admin không hiển thị và không thể chỉnh sửa tại đây.</p>
-        </>
-      )}
+          {error && !users ? (
+            <OgEmptyBox tone="error">{error}</OgEmptyBox>
+          ) : !users ? (
+            <OgEmptyBox>Đang tải dữ liệu...</OgEmptyBox>
+          ) : !filtered.length ? (
+            <OgEmptyBox>{users.length ? "Không có tài khoản phù hợp." : "Chưa có tài khoản."}</OgEmptyBox>
+          ) : (
+            <UsersList users={filtered} meId={me?.id} actions={actions} />
+          )}
+        </OgCard>
 
-      {form ? <UserFormModal user={form.user} onClose={() => setForm(null)} onSaved={load} /> : null}
+        {me?.isSuper ? <LoginSessions /> : null}
+
+        <p className="pb-2 text-center text-xs text-[#64748b]">
+          Xem thêm:{" "}
+          <Link href="/quan-tri/nhat-ky" className="font-semibold text-[#244d68] hover:underline">
+            Lịch sử hoạt động
+          </Link>
+          {me?.isSuper ? (
+            <>
+              {" · "}
+              <Link href="/quan-tri/he-thong" className="font-semibold text-[#244d68] hover:underline">
+                Kết nối PLC &amp; sao lưu
+              </Link>
+            </>
+          ) : null}
+        </p>
+      </PageBody>
+
       {pwUser ? <PasswordModal user={pwUser} onClose={() => setPwUser(null)} /> : null}
     </>
   );

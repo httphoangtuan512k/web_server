@@ -1,12 +1,11 @@
 "use client";
 
-import { KeyRound } from "lucide-react";
 import { useState } from "react";
 import { api, errorMessage } from "@/lib/api";
-import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
+import { OgButton } from "../../_shared/og-button";
 import { MIN_PASSWORD } from "./constants";
 import type { UserAccount } from "./types";
 
@@ -40,16 +39,16 @@ export function PasswordModal({ user, onClose }: { user: UserAccount; onClose: (
       open
       onClose={onClose}
       size="sm"
-      title="Đổi mật khẩu"
-      description={`Tài khoản ${user.fullName || user.username} (${user.username})`}
+      title={`Đổi mật khẩu cho ${user.username}`}
+      description={`${user.fullName || user.username} · mật khẩu mới ít nhất ${MIN_PASSWORD} ký tự.`}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose} disabled={saving}>
+          <OgButton onClick={onClose} disabled={saving}>
             Hủy
-          </Button>
-          <Button type="submit" form="password-form" icon={KeyRound} loading={saving}>
+          </OgButton>
+          <OgButton type="submit" form="password-form" variant="primary" loading={saving}>
             Đổi mật khẩu
-          </Button>
+          </OgButton>
         </>
       }
     >

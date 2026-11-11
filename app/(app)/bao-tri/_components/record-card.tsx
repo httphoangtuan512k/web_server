@@ -1,112 +1,169 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
-import { CalendarClock, ImageOff, Pencil, Trash2, UserRound } from "lucide-react";
+import { cn } from "@/lib/cn";
 import { fmtDateTime } from "@/lib/format";
-import { Button } from "@/components/ui/button";
-import { Badge, Card } from "@/components/ui/card";
 import { afterImageOf, faultImageOf, type MaintenanceRecord } from "./types";
 
-function Thumb({ src, alt, onOpen }: { src: string; alt: string; onOpen: (src: string, alt: string) => void }) {
-  if (!src)
-    return (
-      <div className="grid h-24 w-24 shrink-0 place-items-center rounded-xl border border-dashed border-line-strong bg-surface-2 text-subtle sm:h-28 sm:w-28">
-        <ImageOff size={18} />
-      </div>
-    );
+/** Màu nút giống baotri.html cũ. */
+export const btn = {
+  base: "inline-flex min-h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg px-[17px] py-2 text-sm font-bold whitespace-nowrap transition hover:brightness-95 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60",
+  primary: "bg-[#0f766e] text-white",
+  secondary: "bg-[#e2e8f0] text-[#1e293b]",
+  export: "bg-[#166534] text-white",
+  edit: "bg-[#2563eb] text-white",
+  delete: "bg-[#dc2626] text-white",
+  small: "min-h-8 px-3 py-1.5 text-xs",
+};
+
+/** "08:53 02/11/2026" → giờ và ngày trên 2 dòng như bảng cũ. */
+function DateCell({ v }: { v: string }) {
+  const s = fmtDateTime(v);
+  const i = s.indexOf(" ");
+  return i > 0 ? (
+    <>
+      <span className="block">{s.slice(0, i)}</span>
+      <span className="block">{s.slice(i + 1)}</span>
+    </>
+  ) : (
+    <>{s}</>
+  );
+}
+
+function Thumb({ src, alt, onOpen, className }: { src: string; alt: string; onOpen: (src: string, alt: string) => void; className?: string }) {
+  if (!src) return <span className="text-[#64748b]">-</span>;
   return (
     <button
       type="button"
       onClick={() => onOpen(src, alt)}
-      className="group relative h-24 w-24 shrink-0 overflow-hidden rounded-xl border border-line bg-surface-3 sm:h-28 sm:w-28"
+      className={cn("group inline-block cursor-zoom-in overflow-hidden rounded-md border border-[#d5deea] bg-[#f8fafc] align-middle", className || "h-[65px] w-[75px]")}
       aria-label={`Xem ${alt.toLowerCase()}`}
+      title="Bấm để xem ảnh lớn"
     >
-      <img src={src} alt={alt} loading="lazy" className="h-full w-full object-cover transition-transform group-hover:scale-105" />
+      <img src={src} alt={alt} loading="lazy" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105" />
     </button>
   );
 }
 
-function Block({ label, tone, text, image, imageAlt, onOpen }: { label: string; tone: "danger" | "success"; text: React.ReactNode; image: string; imageAlt: string; onOpen: (src: string, alt: string) => void }) {
-  return (
-    <div className="flex min-w-0 gap-3">
-      <Thumb src={image} alt={imageAlt} onOpen={onOpen} />
-      <div className="min-w-0 flex-1">
-        <p className={tone === "danger" ? "text-[11px] font-semibold tracking-wide text-danger-600 uppercase" : "text-[11px] font-semibold tracking-wide text-success-700 uppercase"}>
-          {label}
-        </p>
-        <div className="mt-1 text-[13.5px] leading-relaxed whitespace-pre-wrap text-fg [overflow-wrap:anywhere]">{text}</div>
-      </div>
-    </div>
-  );
-}
-
-export function RecordCard({
-  record: r,
-  canManage,
-  onOpenImage,
-  onEdit,
-  onDelete,
-}: {
-  record: MaintenanceRecord;
+type Props = {
+  records: MaintenanceRecord[];
   canManage: boolean;
   onOpenImage: (src: string, alt: string) => void;
-  onEdit: () => void;
-  onDelete: () => void;
-}) {
-  const repaired = !!(r.repair_content || r.after_status).trim();
+  onEdit: (r: MaintenanceRecord) => void;
+  onDelete: (r: MaintenanceRecord) => void;
+  /** Dòng thông báo khi không có bản ghi (đang tải / lỗi / trống). */
+  empty?: React.ReactNode;
+};
+
+const HEAD = ["Ngày giờ", "Thiết bị", "Hư hỏng", "Ảnh hư hỏng", "Nội dung sửa chữa", "Trạng thái sau sửa", "Ảnh sau sửa", "Người nhập"];
+const th = "sticky top-0 z-[1] bg-[#475569] px-2.5 py-3 text-center text-[15px] font-bold whitespace-nowrap text-white";
+const td = "border-t border-[#d5deea] px-2.5 py-[11px] text-center align-middle text-[15px] text-[#17243a]";
+const desc = "min-w-[180px] text-left whitespace-pre-wrap [overflow-wrap:anywhere]";
+
+/** Bảng lịch sử bảo trì (máy tính) + dạng thẻ (điện thoại) – cột & nút như bản gốc. */
+export function RecordList({ records, canManage, onOpenImage, onEdit, onDelete, empty }: Props) {
+  const actions = (r: MaintenanceRecord, row?: boolean) =>
+    canManage ? (
+      <div className={cn("flex gap-1.5", row ? "flex-col items-center" : "flex-wrap")}>
+        <button type="button" className={cn(btn.base, btn.small, btn.edit, row && "w-[60px]")} onClick={() => onEdit(r)}>
+          Sửa
+        </button>
+        <button type="button" className={cn(btn.base, btn.small, btn.delete, row && "w-[60px]")} onClick={() => onDelete(r)}>
+          Xóa
+        </button>
+      </div>
+    ) : null;
+
   return (
-    <Card className="flex flex-col">
-      <div className="flex items-start justify-between gap-3 border-b border-line px-4 py-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-[15px] font-semibold text-fg">{r.equipment}</h3>
-            {repaired ? (
-              <Badge tone="success" dot>
-                Đã xử lý
-              </Badge>
+    <>
+      {/* Máy tính / máy tính bảng: bảng như baotri.html */}
+      <div className="hidden max-h-[calc(100dvh-220px)] min-h-[200px] overflow-auto overscroll-x-contain rounded-[9px] border border-[#d5deea] md:block">
+        <table className="w-full min-w-[1100px] border-separate border-spacing-0 bg-white">
+          <thead>
+            <tr>
+              {HEAD.map((h) => (
+                <th key={h} className={th}>
+                  {h}
+                </th>
+              ))}
+              {canManage ? <th className={th}>Thao tác</th> : null}
+            </tr>
+          </thead>
+          <tbody>
+            {empty ? (
+              <tr>
+                <td colSpan={canManage ? 9 : 8} className="p-[30px] text-center text-[#64748b]">
+                  {empty}
+                </td>
+              </tr>
             ) : (
-              <Badge tone="warning" dot>
-                Chờ sửa chữa
-              </Badge>
+              records.map((r) => (
+                <tr key={r.id} className="transition-colors hover:bg-[#f8fafc]">
+                  <td className={cn(td, "whitespace-nowrap")}>
+                    <DateCell v={r.created_at} />
+                  </td>
+                  <td className={cn(td, "min-w-[140px] font-bold [overflow-wrap:anywhere]")}>{r.equipment}</td>
+                  <td className={cn(td, desc)}>{r.fault_description}</td>
+                  <td className={td}>
+                    <Thumb src={faultImageOf(r)} alt={`Ảnh hư hỏng – ${r.equipment}`} onOpen={onOpenImage} />
+                  </td>
+                  <td className={cn(td, desc)}>{r.repair_content || "-"}</td>
+                  <td className={cn(td, desc, "min-w-[150px]")}>{r.after_status || "-"}</td>
+                  <td className={td}>
+                    <Thumb src={afterImageOf(r)} alt={`Ảnh sau sửa – ${r.equipment}`} onOpen={onOpenImage} />
+                  </td>
+                  <td className={td}>{r.created_by || "-"}</td>
+                  {canManage ? <td className={td}>{actions(r, true)}</td> : null}
+                </tr>
+              ))
             )}
-          </div>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted">
-            <span className="inline-flex items-center gap-1">
-              <CalendarClock size={12} /> {fmtDateTime(r.created_at)}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <UserRound size={12} /> {r.created_by || "—"}
-            </span>
-            {r.updated_at ? <span className="text-subtle">Sửa lúc {fmtDateTime(r.updated_at)}</span> : null}
-          </p>
-        </div>
-        {canManage ? (
-          <div className="flex shrink-0 gap-1">
-            <Button size="icon" variant="ghost" icon={Pencil} aria-label="Sửa" title="Sửa" onClick={onEdit} />
-            <Button size="icon" variant="ghost" icon={Trash2} aria-label="Xóa" title="Xóa" className="text-danger-600 hover:bg-danger-50 hover:text-danger-700" onClick={onDelete} />
-          </div>
-        ) : null}
+          </tbody>
+        </table>
       </div>
-      <div className="grid gap-4 p-4 lg:grid-cols-2">
-        <Block label="Hư hỏng" tone="danger" text={r.fault_description} image={faultImageOf(r)} imageAlt={`Ảnh hư hỏng – ${r.equipment}`} onOpen={onOpenImage} />
-        <Block
-          label="Sửa chữa"
-          tone="success"
-          image={afterImageOf(r)}
-          imageAlt={`Ảnh sau sửa – ${r.equipment}`}
-          onOpen={onOpenImage}
-          text={
-            <>
-              {r.repair_content ? <p>{r.repair_content}</p> : <p className="text-subtle">Chưa có nội dung sửa chữa.</p>}
-              {r.after_status ? (
-                <p className="mt-1.5 text-muted">
-                  <span className="font-medium text-fg">Sau sửa:</span> {r.after_status}
-                </p>
-              ) : null}
-            </>
-          }
-        />
+
+      {/* Điện thoại: dạng thẻ */}
+      <div className="md:hidden">
+        {empty ? (
+          <p className="rounded-[9px] border border-[#d5deea] p-[30px] text-center text-[#64748b]">{empty}</p>
+        ) : (
+          <ul className="space-y-3">
+            {records.map((r) => (
+              <li key={r.id} className="overflow-hidden rounded-[10px] border border-[#d5deea] bg-white">
+                <div className="flex items-start justify-between gap-3 bg-[#475569] px-3 py-2 text-white">
+                  <b className="min-w-0 text-[15px] [overflow-wrap:anywhere]">{r.equipment}</b>
+                  <span className="shrink-0 text-right text-xs leading-snug text-white/85">
+                    <DateCell v={r.created_at} />
+                  </span>
+                </div>
+                <div className="space-y-3 p-3 text-sm">
+                  <div className="flex gap-3">
+                    <Thumb src={faultImageOf(r)} alt={`Ảnh hư hỏng – ${r.equipment}`} onOpen={onOpenImage} className="h-[72px] w-[84px] shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-[#475569]">Hư hỏng</p>
+                      <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{r.fault_description}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <Thumb src={afterImageOf(r)} alt={`Ảnh sau sửa – ${r.equipment}`} onOpen={onOpenImage} className="h-[72px] w-[84px] shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-[#475569]">Nội dung sửa chữa</p>
+                      <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{r.repair_content || "-"}</p>
+                      <p className="mt-1.5 text-xs font-bold text-[#475569]">Trạng thái sau sửa</p>
+                      <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{r.after_status || "-"}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#e2e8f0] pt-2.5">
+                    <span className="text-[13px] text-[#64748b]">
+                      Người nhập: <b className="text-[#17243a]">{r.created_by || "-"}</b>
+                    </span>
+                    {actions(r)}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
-    </Card>
+    </>
   );
 }

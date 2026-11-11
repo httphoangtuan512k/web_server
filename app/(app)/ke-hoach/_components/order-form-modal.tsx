@@ -1,13 +1,14 @@
 "use client";
 
-import { ClipboardList, FlaskConical, ImageIcon } from "lucide-react";
+import { ClipboardList, FlaskConical, ImageIcon, Loader2 } from "lucide-react";
 import { useId, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 import { Field, Input, Textarea } from "@/components/ui/form";
 import { ImageInput } from "@/components/ui/image-input";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
+import { BTN_PRIMARY, BTN_SECONDARY } from "./order-bits";
 import type { Order, OrderPayload } from "./types";
 
 type FormValues = Omit<OrderPayload, "quantity"> & { quantity: string };
@@ -153,12 +154,13 @@ export function OrderFormModal({ order, onClose, onSaved }: { order: Order | nul
       description={editing ? "Cập nhật thông tin và quy cách của đơn." : "Các trường có dấu * là bắt buộc."}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose} className="flex-1 sm:flex-none">
+          <button type="button" onClick={onClose} className={cn(BTN_SECONDARY, "flex-1 sm:flex-none sm:min-w-24")}>
             Hủy
-          </Button>
-          <Button type="submit" form={formId} loading={saving} className="flex-1 sm:flex-none">
-            {editing ? "Lưu thay đổi" : "Tạo đơn"}
-          </Button>
+          </button>
+          <button type="submit" form={formId} disabled={saving} className={cn(BTN_PRIMARY, "flex-1 sm:flex-none sm:min-w-24")}>
+            {saving ? <Loader2 size={15} className="animate-spin" /> : null}
+            Lưu
+          </button>
         </>
       }
     >
@@ -189,7 +191,7 @@ export function OrderFormModal({ order, onClose, onSaved }: { order: Order | nul
         <Section icon={ImageIcon} title="Lệnh chạy máy & hình ảnh">
           <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
             <Field label="Lệnh chạy máy">
-              <Textarea value={v.orderCommand} onChange={set("orderCommand")} placeholder="Nhập lệnh chạy máy…" rows={3} />
+              <Textarea value={v.orderCommand} onChange={set("orderCommand")} placeholder="Nhập lệnh chạy máy..." rows={3} />
             </Field>
             <Field label="Hình ảnh bao bì">
               <ImageInput folder="orders" value={v.imageData} onChange={(url) => setV((s) => ({ ...s, imageData: url }))} />

@@ -1,16 +1,13 @@
 "use client";
 
-import { FileClock, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { cn } from "@/lib/cn";
 import { fmtDateTime } from "@/lib/format";
-import { Button } from "@/components/ui/button";
-import { Card, CardHeader, EmptyState, Spinner } from "@/components/ui/card";
-import { SearchInput } from "@/components/ui/form";
 import { useConfirm } from "@/components/ui/modal";
-import { Table, Td, Th, THead, Tr } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
+import { OgButton, OgEmptyRow, ogInput, OgTable, OgTd, OgTh, OgTr } from "../../_shared/og-button";
 import { useApiData } from "../../_shared/use-api-data";
 import { matchesQuery, normalizeText } from "../../_shared/utils";
 import { ActionBadge, ValueChange } from "./action-badge";
@@ -59,71 +56,71 @@ export function OrderHistory() {
     }
   }
 
+  const cols = isSuper ? 7 : 6;
   return (
-    <Card>
-      <CardHeader
-        icon={FileClock}
-        title="Lịch sử đơn hàng"
-        description={isSuper ? "50 thay đổi gần nhất. Super Admin có thể sửa hoặc xóa bản ghi." : "50 thay đổi gần nhất."}
-        actions={
-          <>
-            <SearchInput className="w-full sm:w-64" placeholder="Tìm số đơn, máy, người…" value={q} onChange={(e) => setQ(e.target.value)} />
-            <Button variant="secondary" size="md" icon={RefreshCw} loading={loading} onClick={refresh}>
-              Làm mới
-            </Button>
-          </>
-        }
-      />
-      {error && !rows ? (
-        <EmptyState icon={FileClock} title="Không tải được lịch sử" description={error} />
-      ) : !rows ? (
-        <Spinner />
-      ) : !filtered.length ? (
-        <EmptyState icon={FileClock} title={rows.length ? "Không có bản ghi phù hợp" : "Chưa có lịch sử đơn hàng"} />
-      ) : (
-        <Table maxHeight="70vh">
-          <THead>
-            <tr>
-              <Th>Thời gian</Th>
-              <Th>Số đơn</Th>
-              <Th>Máy</Th>
-              <Th>Người thao tác</Th>
-              <Th>Hành động</Th>
-              <Th>Thay đổi</Th>
-              {isSuper ? <Th align="right">Thao tác</Th> : null}
-            </tr>
-          </THead>
-          <tbody>
-            {filtered.map((r) => (
-              <Tr key={r.id}>
-                <Td className="num whitespace-nowrap text-muted">{fmtDateTime(r.created_at)}</Td>
-                <Td className="font-medium whitespace-nowrap">{r.order_number}</Td>
-                <Td className="whitespace-nowrap">{r.machine_name || <span className="text-subtle">—</span>}</Td>
-                <Td className="whitespace-nowrap">{r.user_name}</Td>
-                <Td>
+    <>
+      <div className="mb-4 flex flex-col gap-2.5 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3 sm:mb-5 sm:flex-row sm:items-center">
+        <input type="search" className={cn(ogInput, "min-h-[38px]! sm:w-72")} placeholder="Tìm số đơn, máy, người…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <OgButton variant="primary" className="self-start font-bold sm:self-auto" loading={loading} onClick={refresh}>
+          Làm mới
+        </OgButton>
+        <span className="text-sm text-[#64748b] sm:ml-auto">
+          {isSuper ? "50 thay đổi gần nhất · Super Admin có thể sửa hoặc xóa." : "50 thay đổi gần nhất."}
+        </span>
+      </div>
+
+      <OgTable maxHeight="70vh" minWidth={isSuper ? 860 : 720}>
+        <thead>
+          <tr>
+            <OgTh>Thời gian</OgTh>
+            <OgTh>Số đơn hàng</OgTh>
+            <OgTh>Máy</OgTh>
+            <OgTh>Tài khoản</OgTh>
+            <OgTh>Hành động</OgTh>
+            <OgTh>Số lượng</OgTh>
+            {isSuper ? <OgTh>Thao tác</OgTh> : null}
+          </tr>
+        </thead>
+        <tbody>
+          {error && !rows ? (
+            <OgEmptyRow colSpan={cols} tone="error">
+              {error}
+            </OgEmptyRow>
+          ) : !rows ? (
+            <OgEmptyRow colSpan={cols}>Đang tải dữ liệu...</OgEmptyRow>
+          ) : !filtered.length ? (
+            <OgEmptyRow colSpan={cols}>{rows.length ? "Không có bản ghi phù hợp." : "Chưa có lịch sử đơn hàng."}</OgEmptyRow>
+          ) : (
+            filtered.map((r) => (
+              <OgTr key={r.id}>
+                <OgTd className="num whitespace-nowrap text-[#64748b]">{fmtDateTime(r.created_at)}</OgTd>
+                <OgTd className="font-semibold whitespace-nowrap">{r.order_number}</OgTd>
+                <OgTd className="whitespace-nowrap">{r.machine_name || "-"}</OgTd>
+                <OgTd className="font-bold whitespace-nowrap">{r.user_name}</OgTd>
+                <OgTd>
                   <ActionBadge action={r.action} />
-                </Td>
-                <Td>
+                </OgTd>
+                <OgTd>
                   <ValueChange oldValue={r.old_value} newValue={r.new_value} />
-                </Td>
+                </OgTd>
                 {isSuper ? (
-                  <Td>
-                    <div className="flex justify-end gap-1">
-                      <Button variant="ghost" size="sm" icon={Pencil} onClick={() => setEditing(r)}>
+                  <OgTd>
+                    <div className="flex gap-1.5">
+                      <OgButton size="sm" onClick={() => setEditing(r)}>
                         Sửa
-                      </Button>
-                      <Button variant="ghost" size="sm" icon={Trash2} className="hover:bg-danger-50 hover:text-danger-600" onClick={() => remove(r)}>
+                      </OgButton>
+                      <OgButton size="sm" variant="danger" onClick={() => remove(r)}>
                         Xóa
-                      </Button>
+                      </OgButton>
                     </div>
-                  </Td>
+                  </OgTd>
                 ) : null}
-              </Tr>
-            ))}
-          </tbody>
-        </Table>
-      )}
+              </OgTr>
+            ))
+          )}
+        </tbody>
+      </OgTable>
       {editing ? <HistoryEditModal row={editing} onClose={() => setEditing(null)} onSaved={refresh} /> : null}
-    </Card>
+    </>
   );
 }

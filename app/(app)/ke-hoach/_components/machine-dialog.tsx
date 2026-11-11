@@ -1,17 +1,20 @@
 "use client";
 
 import { useId, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/cn";
 import { Field, Input } from "@/components/ui/form";
 import { Modal } from "@/components/ui/modal";
+import { BTN_BASE, BTN_SECONDARY } from "./order-bits";
 import type { OrderGroup } from "./types";
 
 export type MachineDialogKind = "start" | "resume" | "addMachine";
 
-const TEXT: Record<MachineDialogKind, { title: string; label: string; submit: string; empty: string }> = {
-  start: { title: "Bắt đầu chạy", label: "Tên máy bắt đầu chạy", submit: "Bắt đầu chạy", empty: "Vui lòng nhập tên máy!" },
-  resume: { title: "Chạy tiếp", label: "Tên máy tiếp tục chạy", submit: "Chạy tiếp", empty: "Vui lòng nhập tên máy!" },
-  addMachine: { title: "Chạy thêm máy", label: "Tên máy mới chạy thêm", submit: "Chạy thêm máy", empty: "Vui lòng nhập tên máy mới!" },
+/** Chữ theo prompt() trang cũ; nút xác nhận cùng chữ & màu với nút trên dòng đơn. */
+const TEXT: Record<MachineDialogKind, { title: string; label: string; submit: string; bg: string; empty: string }> = {
+  start: { title: "▶ Chạy", label: "Chọn/nhập tên máy bắt đầu chạy", submit: "▶ Chạy", bg: "#2563eb", empty: "Vui lòng nhập tên máy!" },
+  resume: { title: "▶ Chạy tiếp", label: "Nhập tên máy tiếp tục chạy", submit: "▶ Chạy tiếp", bg: "#10b981", empty: "Vui lòng nhập tên máy!" },
+  addMachine: { title: "▶ Chạy thêm máy", label: "Nhập tên máy mới chạy thêm", submit: "▶ Chạy thêm máy", bg: "#2563eb", empty: "Vui lòng nhập tên máy mới!" },
 };
 
 /** Hỏi tên máy cho Chạy / Chạy tiếp / Chạy thêm máy (thay cho prompt() trang cũ). */
@@ -54,12 +57,13 @@ export function MachineDialog({
       description={`Đơn ${group.orderNumber}${group.packagingCode ? ` · ${group.packagingCode}` : ""}`}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          <button type="button" onClick={onClose} className={cn(BTN_SECONDARY, "flex-1 sm:flex-none")}>
             Hủy
-          </Button>
-          <Button type="submit" form={formId} loading={busy}>
+          </button>
+          <button type="submit" form={formId} disabled={busy} style={{ background: t.bg }} className={cn(BTN_BASE, "flex-1 text-white sm:flex-none")}>
+            {busy ? <Loader2 size={15} className="animate-spin" /> : null}
             {t.submit}
-          </Button>
+          </button>
         </>
       }
     >
@@ -88,7 +92,7 @@ export function MachineDialog({
                 key={s}
                 type="button"
                 onClick={() => setName(s)}
-                className="rounded-full border border-line-strong bg-surface px-2.5 py-1 text-xs text-muted hover:border-brand-500 hover:text-brand-600"
+                className="rounded-full border border-line-strong bg-surface px-2.5 py-1 text-xs text-muted hover:border-[#2563eb] hover:text-[#2563eb]"
               >
                 {s}
               </button>

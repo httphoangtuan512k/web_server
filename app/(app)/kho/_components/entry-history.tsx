@@ -1,15 +1,15 @@
 "use client";
 
-import { History, Pencil, Save, Trash2 } from "lucide-react";
+import { Save } from "lucide-react";
 import { useState } from "react";
 import { api, errorMessage } from "@/lib/api";
-import { fmtDateTime, fmtNumber, fmtTime } from "@/lib/format";
+import { cn } from "@/lib/cn";
+import { fmtDateTime, fmtNumber } from "@/lib/format";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, EmptyState } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/form";
 import { Modal, useConfirm } from "@/components/ui/modal";
-import { Table, THead, Td, Th, Tr } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
+import { KBtn, KCard, KEmptyRow, KTable, kTd, kTh, kTr } from "./kho-ui";
 import { num, type DailyEntry, type MachineQty } from "./types";
 
 export interface HistoryEntry extends DailyEntry {
@@ -19,19 +19,30 @@ export interface HistoryEntry extends DailyEntry {
 }
 
 function MachineLines({ e }: { e: DailyEntry }) {
-  if (!e.machines?.length) return <span className="text-subtle">—</span>;
+  if (!e.machines?.length) return <span className="text-[#66758a]">—</span>;
   return (
     <div className="space-y-0.5">
       {e.machines.map((m, i) => (
-        <div key={`${m.machine_name}-${i}`} className="text-[13px]">
-          <span className="text-muted">{m.machine_name}:</span> <span className="num font-medium">{fmtNumber(m.quantity)} t</span>
+        <div key={`${m.machine_name}-${i}`}>
+          {m.machine_name}: <b className="tabular-nums">{fmtNumber(m.quantity, 2, "0")} tấn</b>
         </div>
       ))}
     </div>
   );
 }
 
-export function EntryHistory({ entries, editable, onChanged }: { entries: HistoryEntry[]; editable: boolean; onChanged: () => Promise<void> | void }) {
+export function EntryHistory({
+  entries,
+  editable,
+  onChanged,
+  status,
+}: {
+  entries: HistoryEntry[];
+  editable: boolean;
+  onChanged: () => Promise<void> | void;
+  /** Đang tải / lỗi – hiện thay cho các dòng. */
+  status?: string | null;
+}) {
   const toast = useToast();
   const confirm = useConfirm();
   const [editing, setEditing] = useState<HistoryEntry | null>(null);
@@ -71,80 +82,87 @@ export function EntryHistory({ entries, editable, onChanged }: { entries: Histor
 
   const actions = (e: HistoryEntry) =>
     editable ? (
-      <div className="flex justify-end gap-1.5">
-        <Button size="sm" variant="secondary" icon={Pencil} onClick={() => setEditing(e)}>
+      <div className="flex flex-wrap items-center gap-2">
+        <KBtn size="sm" variant="secondary" onClick={() => setEditing(e)}>
           Sửa
-        </Button>
-        <Button size="sm" variant="ghost" icon={Trash2} className="text-danger-600 hover:bg-danger-50 hover:text-danger-700" onClick={() => remove(e)}>
+        </KBtn>
+        <KBtn size="sm" variant="danger" onClick={() => remove(e)}>
           Xóa
-        </Button>
+        </KBtn>
       </div>
-    ) : null;
+    ) : (
+      <span className="text-[#66758a]">—</span>
+    );
+
+  const empty = status || (!entries.length ? "Chưa có lần nhập nào trong ngày." : null);
 
   return (
-    <Card>
-      <CardHeader
-        icon={History}
-        title="Lịch sử nhập trong ngày"
-        description="Có thể sửa / xóa từng lần nhập trước khi chốt; hệ thống cập nhật đúng bản ghi cũ và tính lại tổng sản lượng."
-      />
-      {!entries.length ? (
-        <EmptyState title="Chưa có lần nhập nào trong ngày." />
-      ) : (
-        <>
-          <div className="hidden md:block">
-            <Table>
-              <THead>
-                <tr>
-                  <Th>Thời gian</Th>
-                  <Th>Đơn hàng</Th>
-                  <Th>Máy / sản lượng</Th>
-                  <Th align="right">Sang bao</Th>
-                  <Th>Người nhập</Th>
-                  {editable ? <Th align="right">Thao tác</Th> : null}
+    <KCard title="Lịch sử nhập trong ngày" description="Có thể sửa / xóa từng lần nhập trước khi chốt; khi sửa hệ thống cập nhật bản ghi cũ và tính lại tổng sản lượng.">
+      {/* Máy tính / máy tính bảng */}
+      <div className="hidden md:block">
+        <KTable minWidth={760}>
+          <thead>
+            <tr>
+              {["Thời gian", "Đơn hàng", "Máy / sản lượng", "Sang bao", "Người nhập", "Thao tác"].map((h) => (
+                <th key={h} className={cn(kTh, "text-left")}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {empty ? (
+              <KEmptyRow colSpan={6}>{empty}</KEmptyRow>
+            ) : (
+              entries.map((e) => (
+                <tr key={e.id} className={kTr}>
+                  <td className={cn(kTd, "whitespace-nowrap")}>{fmtDateTime(e.created_at)}</td>
+                  <td className={kTd}>
+                    <b>{e.order_number}</b>
+                  </td>
+                  <td className={kTd}>
+                    <MachineLines e={e} />
+                  </td>
+                  <td className={cn(kTd, "font-semibold whitespace-nowrap tabular-nums")}>{fmtNumber(e.repack_qty, 2, "0")} tấn</td>
+                  <td className={kTd}>{e.created_by || "—"}</td>
+                  <td className={kTd}>{actions(e)}</td>
                 </tr>
-              </THead>
-              <tbody>
-                {entries.map((e) => (
-                  <Tr key={e.id}>
-                    <Td className="whitespace-nowrap">{fmtDateTime(e.created_at)}</Td>
-                    <Td className="font-semibold">{e.order_number}</Td>
-                    <Td>
-                      <MachineLines e={e} />
-                    </Td>
-                    <Td align="right">{fmtNumber(e.repack_qty)} t</Td>
-                    <Td>{e.created_by || "—"}</Td>
-                    {editable ? <Td>{actions(e)}</Td> : null}
-                  </Tr>
-                ))}
-              </tbody>
-            </Table>
-          </div>
-          <ul className="divide-y divide-line md:hidden">
+              ))
+            )}
+          </tbody>
+        </KTable>
+      </div>
+
+      {/* Điện thoại: dạng thẻ */}
+      <div className="md:hidden">
+        {empty ? (
+          <p className="rounded-xl border border-[#dce5ef] px-4 py-7 text-center text-[13px] text-[#66758a]">{empty}</p>
+        ) : (
+          <ul className="space-y-2.5">
             {entries.map((e) => (
-              <li key={e.id} className="px-4 py-3">
+              <li key={e.id} className="rounded-xl border border-[#dce5ef] p-3 text-[13px]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-semibold text-fg">{e.order_number}</p>
-                    <p className="text-xs text-muted">
-                      {fmtTime(e.created_at)} · {e.created_by || "—"}
+                    <b className="text-[15px] text-[#12345a]">{e.order_number}</b>
+                    <p className="text-xs text-[#66758a]">
+                      {fmtDateTime(e.created_at)} · {e.created_by || "—"}
                     </p>
                   </div>
-                  <span className="num text-[13px] text-muted">
-                    Sang bao <b className="text-fg">{fmtNumber(e.repack_qty)} t</b>
+                  <span className="shrink-0 text-xs text-[#66758a]">
+                    Sang bao <b className="text-[13px] text-[#1d2939] tabular-nums">{fmtNumber(e.repack_qty, 2, "0")} tấn</b>
                   </span>
                 </div>
                 <div className="mt-2">
                   <MachineLines e={e} />
                 </div>
-                {editable ? <div className="mt-2">{actions(e)}</div> : null}
+                {editable ? <div className="mt-2.5">{actions(e)}</div> : null}
               </li>
             ))}
           </ul>
-        </>
-      )}
+        )}
+      </div>
       {editing ? <EditEntryModal entry={editing} onClose={() => setEditing(null)} onSaved={onChanged} /> : null}
-    </Card>
+    </KCard>
   );
 }
 

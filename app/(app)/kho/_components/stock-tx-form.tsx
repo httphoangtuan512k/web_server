@@ -1,42 +1,17 @@
 "use client";
 
-import { ArrowDownToLine, ArrowUpFromLine, Save } from "lucide-react";
 import { useState } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { Button } from "@/components/ui/button";
-import { Field, Input, Select } from "@/components/ui/form";
 import { useToast } from "@/components/ui/toast";
+import { KBtn, KField, kInput } from "./kho-ui";
 import { CATEGORY_LABEL, itemOptionLabel, type ItemCategory, type StockAction, type WarehouseItem } from "./types";
 
 const QTY: Record<ItemCategory, { label: string; step: string; min: string; note: string; item: string }> = {
-  goods: { label: "Số lượng (tấn)", step: "0.01", min: "0.01", note: "Nhà cung cấp / khách hàng / nội dung…", item: "Hàng hóa" },
-  packaging: { label: "Số lượng (bao)", step: "1", min: "1", note: "Số phiếu / bộ phận nhận…", item: "Loại bao bì / số lô" },
-  materials: { label: "Số lượng", step: "0.01", min: "0.01", note: "Nhà cung cấp / người nhận…", item: "Vật tư / vị trí kệ" },
+  goods: { label: "Số lượng (tấn)", step: "0.01", min: "0.01", note: "Nhà cung cấp / khách hàng / nội dung...", item: "Hàng hóa" },
+  packaging: { label: "Số lượng (bao)", step: "1", min: "1", note: "Số phiếu / bộ phận nhận...", item: "Loại bao bì / số lô" },
+  materials: { label: "Số lượng", step: "0.01", min: "0.01", note: "Nhà cung cấp / người nhận...", item: "Vật tư / vị trí kệ" },
 };
-
-/** Ô chọn Nhập / Xuất dạng segmented. */
-function ActionToggle({ value, onChange }: { value: StockAction; onChange: (v: StockAction) => void }) {
-  const opt = (v: StockAction, label: string, Icon: typeof ArrowDownToLine) => (
-    <button
-      type="button"
-      onClick={() => onChange(v)}
-      aria-pressed={value === v}
-      className={cn(
-        "inline-flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-medium transition-colors",
-        value === v ? (v === "in" ? "bg-success-600 text-white shadow-sm" : "bg-danger-600 text-white shadow-sm") : "text-muted hover:text-fg",
-      )}
-    >
-      <Icon size={15} /> {label}
-    </button>
-  );
-  return (
-    <div className="flex h-10 items-center gap-1 rounded-[10px] border border-line-strong bg-surface-3 p-1">
-      {opt("in", "Nhập kho", ArrowDownToLine)}
-      {opt("out", "Xuất kho", ArrowUpFromLine)}
-    </div>
-  );
-}
 
 /**
  * Form ghi nhận nhập / xuất kho.
@@ -86,10 +61,17 @@ export function StockTxForm({
   }
 
   return (
-    <form onSubmit={save} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(170px,1fr))] lg:items-end">
+    <form
+      onSubmit={save}
+      className={cn(
+        "grid grid-cols-1 gap-2.5 min-[480px]:grid-cols-2 lg:flex lg:flex-wrap lg:items-end",
+        fixedCategory && "rounded-[11px] border border-[#e0ebf7] bg-[#f6faff] p-3 sm:p-[15px]",
+      )}
+    >
       {!fixedCategory ? (
-        <Field label="Nhóm kho">
-          <Select
+        <KField label="Nhóm kho" className="lg:min-w-[145px] lg:flex-1">
+          <select
+            className={kInput}
             value={cat}
             onChange={(e) => {
               setCat(e.target.value as ItemCategory);
@@ -101,11 +83,11 @@ export function StockTxForm({
                 {CATEGORY_LABEL[c]}
               </option>
             ))}
-          </Select>
-        </Field>
+          </select>
+        </KField>
       ) : null}
-      <Field label={fixedCategory ? cfg.item : "Mặt hàng"} className="lg:min-w-[240px]">
-        <Select value={effectiveItemId} onChange={(e) => setItemId(e.target.value)} disabled={!items.length}>
+      <KField label={fixedCategory ? cfg.item : "Mặt hàng"} className="min-[480px]:col-span-2 lg:min-w-[240px] lg:flex-[1.6]">
+        <select className={kInput} value={effectiveItemId} onChange={(e) => setItemId(e.target.value)} disabled={!items.length}>
           {items.length ? (
             items.map((x) => (
               <option key={x.id} value={x.id}>
@@ -115,20 +97,23 @@ export function StockTxForm({
           ) : (
             <option value="">Chưa có danh mục — cần tạo mặt hàng trước</option>
           )}
-        </Select>
-      </Field>
-      <Field label="Loại giao dịch">
-        <ActionToggle value={action} onChange={setAction} />
-      </Field>
-      <Field label={fixedCategory ? cfg.label : `Số lượng${current?.unit ? ` (${current.unit})` : ""}`}>
-        <Input type="number" inputMode="decimal" min={cfg.min} step={cfg.step} value={quantity} onChange={(e) => setQuantity(e.target.value)} required />
-      </Field>
-      <Field label="Ghi chú">
-        <Input placeholder={fixedCategory ? cfg.note : "Nội dung / người nhận…"} value={note} onChange={(e) => setNote(e.target.value)} />
-      </Field>
-      <Button type="submit" variant="success" icon={Save} loading={saving} disabled={!items.length}>
+        </select>
+      </KField>
+      <KField label="Loại giao dịch" className="lg:min-w-[145px] lg:flex-1">
+        <select className={kInput} value={action} onChange={(e) => setAction(e.target.value as StockAction)}>
+          <option value="in">Nhập kho</option>
+          <option value="out">Xuất kho</option>
+        </select>
+      </KField>
+      <KField label={fixedCategory ? cfg.label : `Số lượng${current?.unit ? ` (${current.unit})` : ""}`} className="lg:min-w-[145px] lg:flex-1">
+        <input className={kInput} type="number" inputMode="decimal" min={cfg.min} step={cfg.step} value={quantity} onChange={(e) => setQuantity(e.target.value)} required />
+      </KField>
+      <KField label="Ghi chú" className="min-[480px]:col-span-2 lg:min-w-[200px] lg:flex-[1.6]">
+        <input className={kInput} placeholder={fixedCategory ? cfg.note : "Nội dung / người nhận..."} value={note} onChange={(e) => setNote(e.target.value)} />
+      </KField>
+      <KBtn type="submit" variant="green" loading={saving} disabled={!items.length} className="min-[480px]:col-span-2 lg:col-span-1">
         {fixedCategory ? "Lưu nhập / xuất" : "Lưu giao dịch"}
-      </Button>
+      </KBtn>
     </form>
   );
 }

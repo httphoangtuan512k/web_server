@@ -1,23 +1,32 @@
 "use client";
 
-import { DatabaseBackup, Eye, PencilLine, RefreshCw } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { cn } from "@/lib/cn";
 import { todayKey } from "@/lib/format";
 import { PageGuard } from "@/components/shell/page-guard";
-import { Button } from "@/components/ui/button";
-import { Badge, Card, PageHeader, Spinner } from "@/components/ui/card";
+import { PageBody, PageTopbar } from "@/components/shell/page-topbar";
+import { Spinner } from "@/components/ui/card";
 import { useConfirm } from "@/components/ui/modal";
-import { Tabs } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast";
-import { ClosingsTab } from "./closings-tab";
 import { DailyTab } from "./daily-tab";
 import { ItemsTab } from "./items-tab";
+import { KBtn, KCard } from "./kho-ui";
 import { TransactionsTab } from "./transactions-tab";
 import type { WarehouseData } from "./types";
 
-type TabKey = "daily" | "closings" | "goods" | "packaging" | "materials" | "transactions";
+type TabKey = "daily" | "goods" | "packaging" | "materials" | "transactions";
+
+/** Thứ tự & chữ các tab giống kho.html cũ. */
+const TABS: Array<{ value: TabKey; label: string }> = [
+  { value: "daily", label: "Tổng hợp cuối ngày" },
+  { value: "goods", label: "Hàng hóa" },
+  { value: "packaging", label: "Bao bì" },
+  { value: "materials", label: "Vật tư" },
+  { value: "transactions", label: "Lịch sử nhập / xuất" },
+];
 
 export function KhoPage() {
   return (
@@ -77,74 +86,106 @@ function Warehouse() {
   const openDate = (date: string) => {
     setWorkDate(date);
     setTab("daily");
+    if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const count = (k: TabKey) => (data && (k === "goods" || k === "packaging" || k === "materials") ? data[k].length : null);
+
   return (
-    <>
-      <PageHeader
-        title="Quản lý kho"
-        description="Sản lượng cuối ngày, tồn kho hàng hóa, bao bì và vật tư"
-        actions={
+    <div className="min-h-dvh bg-[#f4f7fb] text-sm text-[#1d2939]">
+      <PageTopbar
+        color="linear-gradient(115deg,#12345a,#1f5688)"
+        title={
           <>
+            SUPER WHITE <span className="block text-xs font-medium tracking-[1px] text-[#c9ddf2] sm:inline sm:text-sm">/ QUẢN LÝ KHO</span>
+          </>
+        }
+        subtitle={
+          <>
+            <span className="block truncate text-[#d7e5f3]">Theo dõi sản lượng, tồn kho hàng hóa, bao bì và vật tư</span>
             {data ? (
-              canEdit ? (
-                <Badge tone="success" dot>
-                  <PencilLine size={12} /> Được chỉnh sửa
-                </Badge>
-              ) : (
-                <Badge tone="neutral">
-                  <Eye size={12} /> Chỉ xem
-                </Badge>
-              )
-            ) : null}
-            {data?.isSuper ? (
-              <Button variant="secondary" icon={DatabaseBackup} loading={backingUp} onClick={backupNow}>
-                Sao lưu ngay
-              </Button>
+              <span className="block truncate text-[#d7e5f3]">
+                {canEdit ? "Bạn có quyền chỉnh sửa dữ liệu Kho." : "Chế độ chỉ xem: tài khoản này chưa được cấp quyền chỉnh sửa Kho."}
+              </span>
             ) : null}
           </>
         }
+        backHref={null}
+        actions={
+          <Link
+            href="/"
+            className="inline-flex min-h-9 items-center justify-center rounded-[9px] bg-white px-[15px] py-2 text-sm font-bold whitespace-nowrap text-[#12345a] shadow-sm transition hover:-translate-y-px hover:bg-[#eef3f8]"
+          >
+            ← Trang chủ
+          </Link>
+        }
       />
 
-      {!data ? (
-        error ? (
-          <Card className="p-6 text-center">
-            <p className="text-sm text-danger-600">{error}</p>
-            <Button className="mt-4" variant="secondary" icon={RefreshCw} onClick={reload}>
-              Thử lại
-            </Button>
-          </Card>
+      <PageBody>
+        <nav
+          role="tablist"
+          aria-label="Chức năng kho"
+          className="mb-[18px] flex flex-wrap gap-1.5 rounded-xl border border-[#e0e8f1] bg-[#eaf0f7] p-[7px] sm:gap-2"
+        >
+          {TABS.map((t) => {
+            const active = tab === t.value;
+            const n = count(t.value);
+            return (
+              <button
+                key={t.value}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setTab(t.value)}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-lg border px-[11px] py-[9px] text-[13px] font-bold whitespace-nowrap transition sm:px-[17px] sm:py-[11px] sm:text-sm",
+                  active
+                    ? "border-[#dce6f1] bg-white text-[#12345a] shadow-[0_2px_7px_#173c6412]"
+                    : "border-transparent text-[#43556d] hover:bg-white/60 hover:text-[#12345a]",
+                )}
+              >
+                {t.label}
+                {n !== null ? (
+                  <span className={cn("rounded-full px-1.5 text-[11px] font-semibold tabular-nums", active ? "bg-[#edf5fd] text-[#2867a5]" : "bg-white/70 text-[#66758a]")}>
+                    {n}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </nav>
+
+        {!data ? (
+          error ? (
+            <KCard className="text-center">
+              <p className="text-sm text-[#c24141]">{error}</p>
+              <KBtn variant="secondary" className="mt-4" onClick={reload}>
+                Thử lại
+              </KBtn>
+            </KCard>
+          ) : (
+            <Spinner />
+          )
         ) : (
-          <Spinner />
-        )
-      ) : (
-        <>
-          {!canEdit ? (
-            <p className="mb-4 rounded-xl border border-line bg-surface-2 px-4 py-3 text-[13px] text-muted">
-              Chế độ chỉ xem: tài khoản này chưa được cấp quyền chỉnh sửa dữ liệu Kho.
-            </p>
-          ) : null}
-          <Tabs<TabKey>
-            className="mb-5"
-            value={tab}
-            onChange={setTab}
-            items={[
-              { value: "daily", label: "Sản lượng trong ngày" },
-              { value: "closings", label: "Lịch sử chốt" },
-              { value: "goods", label: "Hàng hóa", count: data.goods.length },
-              { value: "packaging", label: "Bao bì", count: data.packaging.length },
-              { value: "materials", label: "Vật tư", count: data.materials.length },
-              { value: "transactions", label: "Giao dịch" },
-            ]}
-          />
-          {tab === "daily" ? <DailyTab date={workDate} onDateChange={setWorkDate} canEdit={canEdit} closingDates={data.closingDates} onClosed={reload} /> : null}
-          {tab === "closings" ? <ClosingsTab onOpenDate={openDate} /> : null}
-          {tab === "goods" || tab === "packaging" || tab === "materials" ? (
-            <ItemsTab key={tab} category={tab} items={data[tab]} canEdit={canEdit} onChanged={reload} />
-          ) : null}
-          {tab === "transactions" ? <TransactionsTab data={data} canEdit={canEdit} onChanged={reload} /> : null}
-        </>
-      )}
-    </>
+          <>
+            {tab === "daily" ? (
+              <DailyTab
+                date={workDate}
+                onDateChange={setWorkDate}
+                canEdit={canEdit}
+                closingDates={data.closingDates}
+                onClosed={reload}
+                onOpenDate={openDate}
+                backup={data.isSuper ? { run: backupNow, loading: backingUp } : undefined}
+              />
+            ) : null}
+            {tab === "goods" || tab === "packaging" || tab === "materials" ? (
+              <ItemsTab key={tab} category={tab} items={data[tab]} canEdit={canEdit} onChanged={reload} />
+            ) : null}
+            {tab === "transactions" ? <TransactionsTab data={data} canEdit={canEdit} onChanged={reload} /> : null}
+          </>
+        )}
+      </PageBody>
+    </div>
   );
 }

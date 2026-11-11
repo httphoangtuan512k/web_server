@@ -1,0 +1,309 @@
+/*
+ * Sơ đồ SCADA máy nghiền – ảnh gốc (1019×570) + lớp số liệu đặt đè ĐÚNG toạ độ của vanhanh.html cũ
+ * (.scada-reference-* / .scada-*). Mọi vị trí theo % khung ảnh, kích thước/chữ theo cqw (1cqw = 1% bề rộng sơ đồ)
+ * nên ô số luôn nằm đúng chỗ trên ảnh ở mọi màn hình. clamp() chỉ giữ chữ đủ đọc trên điện thoại.
+ * Lưu ý: dự án biên dịch mọi *.css thành CSS toàn cục (kể cả *.module.css) nên tên lớp có tiền tố scd-.
+ * Mốc tham chiếu: sơ đồ rộng 700px trên máy tính như bản gốc.
+ */
+
+.scd-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1019 / 570;
+  container-type: inline-size;
+  /* chừa chỗ cho ô hệ số nằm sát mép dưới (top 98%) */
+  margin-bottom: 12px;
+}
+
+.scd-img,
+.scd-svg,
+.scd-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.scd-img {
+  display: block;
+  object-fit: fill;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.scd-svg {
+  pointer-events: none;
+  overflow: visible;
+}
+
+.scd-overlay {
+  pointer-events: none;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #111827;
+}
+
+/* ---------- Ô chung: tâm ô đặt tại (left, top) ---------- */
+.scd-box {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  box-sizing: border-box;
+  text-align: center;
+  z-index: 2;
+}
+
+/* Ô nhập trong suốt đặt trên ảnh (mức đầy, tồn phễu, tồn silo). */
+.scd-bare-input {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  text-align: center;
+  font: inherit;
+  font-weight: 800;
+  line-height: 1.05;
+  pointer-events: auto;
+  appearance: textfield;
+  border-radius: 2px;
+  cursor: text;
+}
+.scd-bare-input:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.7);
+  box-shadow: 0 0 0 1px #cbd5e1;
+}
+.scd-bare-input:focus {
+  background: #fff;
+  box-shadow: 0 0 0 1px #94a3b8;
+}
+.scd-bare-input:disabled {
+  cursor: default;
+  -webkit-text-fill-color: currentColor;
+  opacity: 1;
+}
+.scd-bare-input[data-saved] {
+  background: #dcfce7;
+}
+
+/* ---------- PHỄU: mức đầy (ô viền xanh lá) ---------- */
+.scd-hopper-setpoint {
+  left: 8.15%;
+  top: 14.4%;
+  width: 7.3cqw;
+  min-width: 34px;
+  height: max(2.3cqw, 12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  pointer-events: auto;
+  background: #fff;
+  color: #166534;
+  border: clamp(1px, 0.29cqw, 2.5px) solid #16a34a;
+  font-size: clamp(7.5px, 1.7cqw, 16px);
+  line-height: 1;
+}
+.scd-hopper-setpoint .scd-bare-input {
+  height: 100%;
+  font-weight: 700;
+  color: #166534;
+}
+
+/* ---------- Tồn phễu / tồn silo A, B (chữ đậm + nhãn nhỏ in hoa) ---------- */
+.scd-stock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  font-size: clamp(7.5px, 1.6cqw, 15px);
+  font-weight: 800;
+  line-height: 1.05;
+  color: #111827;
+}
+.scd-stock small {
+  display: block;
+  margin-top: 0.23cqw;
+  color: #334155;
+  font-size: clamp(5.5px, 1.14cqw, 11px);
+  font-weight: 700;
+  line-height: 1.05;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.scd-hopper-stock {
+  left: 8.15%;
+  top: 23%;
+  width: 7.73cqw;
+  min-width: 30px;
+  min-height: 7.4cqw;
+}
+.scd-stock-a,
+.scd-stock-b {
+  top: 58%;
+  width: 5.68cqw;
+  min-width: 26px;
+  min-height: 7.27cqw;
+}
+.scd-stock-a {
+  left: 68.5%;
+}
+.scd-stock-b {
+  left: 91.7%;
+}
+
+/* ---------- Bộ đếm JB / Đóng bao dưới silo ---------- */
+.scd-counter {
+  top: 89.5%;
+  min-width: 8.64cqw;
+  padding: 0.45cqw 0.57cqw;
+  background: #fff;
+  border: max(1px, 0.23cqw) solid #16a34a;
+  border-radius: 0.57cqw;
+  color: #111827;
+  line-height: 1.05;
+}
+.scd-counter span {
+  display: block;
+  font-size: clamp(7.5px, 1.93cqw, 18px);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.scd-counter small {
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 0.5cqw);
+  transform: translateX(-50%);
+  display: block;
+  margin: 0;
+  font-size: clamp(6px, 1.36cqw, 13px);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.scd-counter-a {
+  left: 68.5%;
+}
+.scd-counter-b {
+  left: 91.7%;
+}
+
+/* ---------- Hệ số A / B (ô nhập nhỏ viền xám sát mép dưới) ---------- */
+.scd-coeff {
+  /* 98% như bản gốc; khung hẹp (< 560px) chữ chạm cỡ tối thiểu nên đẩy xuống thêm vài px để không đè nhãn JB/Đóng bao */
+  top: calc(98% + max(0px, (560px - 100cqw) * 0.035));
+  display: flex;
+  align-items: center;
+  pointer-events: auto;
+  font-size: clamp(7px, 1.25cqw, 12px);
+  font-weight: 700;
+  color: #334155;
+  white-space: nowrap;
+}
+.scd-coeff input {
+  width: 6cqw;
+  min-width: 26px;
+  padding: 0.23cqw;
+  border: 1px solid #94a3b8;
+  border-radius: 0.45cqw;
+  background: #fff;
+  color: #0f172a;
+  text-align: center;
+  font: inherit;
+  font-weight: 700;
+  box-sizing: border-box;
+  pointer-events: auto;
+  outline: 0;
+}
+.scd-coeff input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgb(37 99 235 / 0.2);
+}
+.scd-coeff input:disabled {
+  background: #f1f5f9;
+  opacity: 0.75;
+}
+.scd-coeff input[data-saved] {
+  background: #dcfce7;
+}
+.scd-coeff-a {
+  left: 68.5%;
+}
+.scd-coeff-b {
+  left: 91.7%;
+}
+
+/* ---------- Lớp SVG: đèn cảm biến, sản lượng, xoắn cấp liệu, trục quay ---------- */
+.scd-dot {
+  stroke-width: 3;
+  transition:
+    fill 0.2s,
+    stroke 0.2s;
+}
+.scd-dot-unknown {
+  fill: #94a3b8;
+  stroke: #64748b;
+}
+.scd-dot-off {
+  fill: #fff;
+  stroke: #16a34a;
+}
+.scd-dot-on {
+  fill: #ef4444;
+  stroke: #991b1b;
+}
+
+.scd-production {
+  font:
+    700 16px Arial,
+    Helvetica,
+    sans-serif;
+  fill: #111827;
+  text-anchor: middle;
+}
+
+.scd-spiral {
+  opacity: 0;
+  fill: none;
+  stroke: #facc15;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-dasharray: 7 7;
+}
+.scd-spiral-active {
+  opacity: 1;
+  animation: scd-spiral 0.7s linear infinite;
+}
+@keyframes scd-spiral {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+
+.scd-cylinder {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.scd-cylinder-on {
+  opacity: 1;
+}
+.scd-ribs {
+  animation: scd-roll 0.85s linear infinite;
+}
+@keyframes scd-roll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-44px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scd-spiral-active,
+  .scd-ribs {
+    animation: none;
+  }
+}

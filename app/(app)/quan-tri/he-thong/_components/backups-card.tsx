@@ -1,21 +1,20 @@
 "use client";
 
-import { Archive, DatabaseBackup, Download, RefreshCw } from "lucide-react";
+import { Archive } from "lucide-react";
 import { useMemo, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
 import { fmtBytes, fmtDateTime, fmtRelative } from "@/lib/format";
-import { Button } from "@/components/ui/button";
-import { Badge, Card, CardHeader, EmptyState, Spinner } from "@/components/ui/card";
 import { useConfirm } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
+import { OgButton, OgCard, OgCardTitle, OgEmptyBox, OgPill } from "../../_shared/og-button";
 import { useApiData } from "../../_shared/use-api-data";
 import type { BackupCreateResponse, BackupItem, BackupListResponse } from "./types";
 
-const KIND: Record<string, { label: string; tone: "brand" | "success" | "neutral" | "accent" }> = {
-  daily: { label: "Hằng ngày", tone: "success" },
-  manual: { label: "Thủ công", tone: "brand" },
-  startup: { label: "Khởi động", tone: "neutral" },
-  cron: { label: "Tự động", tone: "success" },
+const KIND: Record<string, { label: string; tone: "default" | "ok" | "muted" }> = {
+  daily: { label: "Hằng ngày", tone: "ok" },
+  manual: { label: "Thủ công", tone: "default" },
+  startup: { label: "Khởi động", tone: "muted" },
+  cron: { label: "Tự động", tone: "ok" },
 };
 
 /** Tên dạng 'YYYY-MM-DD_<loại>_HHMMSS' → loại. */
@@ -26,6 +25,7 @@ function kindOf(name: string) {
 const pathOf = (b: BackupItem) => b.pathname || b.path || b.name;
 const displayName = (b: BackupItem) => (b.name || pathOf(b)).split("/").pop() || b.name;
 
+/** Sao lưu dữ liệu (chức năng mới, không có ở trang cũ) – GET/POST /api/superadmin/backups. */
 export function BackupsCard() {
   const toast = useToast();
   const confirm = useConfirm();
@@ -74,74 +74,78 @@ export function BackupsCard() {
   const latest = rows?.[0];
 
   return (
-    <Card className="flex flex-col">
-      <CardHeader
-        icon={DatabaseBackup}
+    <OgCard>
+      <OgCardTitle
         title="Sao lưu dữ liệu"
-        description="Tự động sao lưu hằng ngày; lưu giữ vĩnh viễn, không tự xóa bản cũ."
+        help={
+          <>
+            Tự động sao lưu hằng ngày; lưu giữ vĩnh viễn, không tự xóa bản cũ.
+            {rows ? (
+              <>
+                {" "}
+                · <b className="font-semibold text-[#1e293b]">{rows.length}</b> bản sao lưu
+                {latest ? (
+                  <>
+                    , gần nhất <b className="font-semibold text-[#1e293b]">{fmtRelative(latest.createdAt)}</b> ({fmtDateTime(latest.createdAt)})
+                  </>
+                ) : null}
+                .
+              </>
+            ) : null}
+          </>
+        }
         actions={
           <>
-            <Button variant="ghost" size="icon" icon={RefreshCw} loading={loading} onClick={refresh} aria-label="Làm mới" title="Làm mới" />
-            <Button icon={DatabaseBackup} loading={creating} onClick={create}>
+            <OgButton loading={loading} onClick={refresh}>
+              Làm mới
+            </OgButton>
+            <OgButton variant="primary" loading={creating} onClick={create}>
               Sao lưu ngay
-            </Button>
+            </OgButton>
           </>
         }
       />
-      <div className="grid grid-cols-2 gap-px border-b border-line bg-line">
-        <div className="bg-surface px-5 py-3">
-          <p className="text-xs text-muted">Số bản sao lưu</p>
-          <p className="num mt-0.5 text-lg font-semibold">{rows ? rows.length : "—"}</p>
-        </div>
-        <div className="bg-surface px-5 py-3">
-          <p className="text-xs text-muted">Gần nhất</p>
-          <p className="mt-0.5 text-sm font-medium">{latest ? fmtRelative(latest.createdAt) : "—"}</p>
-          {latest ? <p className="num text-xs text-muted">{fmtDateTime(latest.createdAt)}</p> : null}
-        </div>
-      </div>
 
       {error && !rows ? (
-        <EmptyState icon={Archive} title="Không tải được danh sách sao lưu" description={error} />
+        <OgEmptyBox tone="error">{error}</OgEmptyBox>
       ) : !rows ? (
-        <Spinner />
+        <OgEmptyBox>Đang tải...</OgEmptyBox>
       ) : !rows.length ? (
-        <EmptyState icon={Archive} title="Chưa có bản sao lưu nào" description="Bấm “Sao lưu ngay” để tạo bản đầu tiên." />
+        <OgEmptyBox>Chưa có bản sao lưu nào. Bấm “Sao lưu ngay” để tạo bản đầu tiên.</OgEmptyBox>
       ) : (
-        <ul className="max-h-[440px] divide-y divide-line overflow-y-auto">
+        <ul className="max-h-[440px] divide-y divide-[#edf0f4] overflow-y-auto rounded-lg border border-[#e2e8f0]">
           {rows.map((b) => {
             const k = KIND[kindOf(b.name)];
             const p = pathOf(b);
             return (
-              <li key={p} className="flex items-center gap-3 px-5 py-3 hover:bg-surface-2">
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-surface-3 text-muted">
+              <li key={p} className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-[#f8fafc] sm:px-4">
+                <span className="hidden h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#eaf1f6] text-[#244d68] min-[420px]:grid">
                   <Archive size={16} />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-mono text-[13px] text-fg" title={p}>
+                  <p className="truncate font-mono text-[13px]" title={p}>
                     {displayName(b)}
                   </p>
-                  <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted">
+                  <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[#64748b]">
                     <span className="num">{fmtDateTime(b.createdAt)}</span>
                     {typeof b.size === "number" ? <span className="num">· {fmtBytes(b.size)}</span> : null}
-                    {k ? <Badge tone={k.tone}>{k.label}</Badge> : null}
+                    {k ? <OgPill tone={k.tone}>{k.label}</OgPill> : null}
                   </p>
                 </div>
-                <Button
-                  variant="secondary"
+                <OgButton
                   size="sm"
-                  icon={Download}
                   loading={downloading === p}
                   disabled={!!downloading && downloading !== p}
                   onClick={() => download(b)}
                   aria-label={`Tải về ${displayName(b)}`}
                 >
-                  <span className="hidden sm:inline">Tải về</span>
-                </Button>
+                  ↓ Tải về
+                </OgButton>
               </li>
             );
           })}
         </ul>
       )}
-    </Card>
+    </OgCard>
   );
 }

@@ -3,13 +3,13 @@
 import { Activity, ClipboardList, Cog, FlaskConical, History, ImageOff, Maximize2, ShieldCheck } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { fmtDate, fmtDateTime } from "@/lib/format";
-import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/cn";
 import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import { DetailField } from "./detail-field";
 import { OperationTimeline } from "./operation-timeline";
 import { OrderActionButtons, type OrderActionKind } from "./order-actions";
-import { ProductionProgress, StatusBadge } from "./order-bits";
+import { BTN_BASE, BTN_SECONDARY, ProductionProgress, StatusBadge } from "./order-bits";
 import type { EditableOrderField, OrderGroup, OrderPerms } from "./types";
 import { dateKey, fmtTons, remainingOf, toNum } from "./utils";
 
@@ -119,8 +119,7 @@ export function OrderDetailModal({
       size="xl"
       title={
         <span className="flex flex-wrap items-center gap-2">
-          Đơn {group.orderNumber || "—"}
-          <span className="font-normal text-muted">· {group.itemCode || "—"}</span>
+          Chi tiết: {group.orderNumber || "-"} - {group.itemCode || "-"}
           <StatusBadge order={group} />
         </span>
       }
@@ -128,12 +127,13 @@ export function OrderDetailModal({
       footer={
         <div className="flex w-full flex-wrap items-center gap-2">
           <OrderActionButtons group={group} perms={perms} onAction={onAction} pending={pending} className="mr-auto" />
-          <Button variant="ghost" icon={History} onClick={() => onOpenHistory(group.orderNumber)}>
+          <button type="button" onClick={() => onOpenHistory(group.orderNumber)} className={cn(BTN_BASE, "text-[#334155] shadow-none hover:bg-[#e8edf2] hover:brightness-100")}>
+            <History size={15} />
             Nhật ký thao tác
-          </Button>
-          <Button variant="secondary" onClick={onClose}>
+          </button>
+          <button type="button" onClick={onClose} className={BTN_SECONDARY}>
             Đóng
-          </Button>
+          </button>
         </div>
       }
     >
@@ -198,7 +198,7 @@ export function OrderDetailModal({
             {F("itemCode", "Mã hàng", dash(rep.itemCode))}
             {F("packagingCode", "Mã bao bì", dash(rep.packagingCode))}
             {F("quantity", "Số lượng (tấn)", <span className="num">{fmtTons(rep.quantity)}</span>, { type: "number" })}
-            {F("exportDate", "Ngày xuất hàng", fmtDate(rep.exportDate), { type: "date", value: dateKey(rep.exportDate) })}
+            {F("exportDate", "Ngày xuất", fmtDate(rep.exportDate), { type: "date", value: dateKey(rep.exportDate) })}
             {F("createdAt", "Ngày tạo", fmtDate(rep.createdAt), { type: "date", value: dateKey(rep.createdAt) })}
           </div>
         </Section>
