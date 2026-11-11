@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
+import { OrdersController } from './orders.controller';
 
-// TODO(port): khai báo controllers/providers của phân hệ orders.
-@Module({ controllers: [], providers: [], exports: [] })
+@Module({ controllers: [OrdersController], providers: [], exports: [] })
 export class OrdersModule {}

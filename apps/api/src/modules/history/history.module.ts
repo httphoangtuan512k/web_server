@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
+import { HistoryController, LogsController } from './history.controller';
 
-// TODO(port): khai báo controllers/providers của phân hệ history.
-@Module({ controllers: [], providers: [], exports: [] })
+@Module({ controllers: [HistoryController, LogsController], providers: [], exports: [] })
 export class HistoryModule {}

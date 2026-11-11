@@ -10,6 +10,14 @@ import { canSee, NAV } from "@/lib/nav";
 import { ConfirmProvider } from "@/components/ui/modal";
 import { Spinner } from "@/components/ui/card";
 
+function readTheme() {
+  try {
+    return localStorage.getItem("sw-theme");
+  } catch {
+    return null;
+  }
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
@@ -24,7 +32,12 @@ function Shell({ children }: { children: React.ReactNode }) {
   const { me, loading } = useAuth();
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  useEffect(() => setOpen(false), [pathname]);
+  // Đóng menu mobile khi chuyển trang (điều chỉnh state trong lúc render, không cần effect).
+  const [lastPath, setLastPath] = useState(pathname);
+  if (pathname !== lastPath) {
+    setLastPath(pathname);
+    setOpen(false);
+  }
 
   return (
     <div className="min-h-dvh lg:pl-[260px]">
@@ -107,17 +120,14 @@ function NavGroup({ group, title }: { group: "main" | "admin"; title?: string })
 function UserCard() {
   const { me, logout } = useAuth();
   const [menu, setMenu] = useState(false);
-  const [dark, setDark] = useState<boolean | null>(null);
+  const [dark, setDark] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    const saved = readTheme();
+    return saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches;
+  });
   useEffect(() => {
-    const saved = (() => {
-      try {
-        return localStorage.getItem("sw-theme");
-      } catch {
-        return null;
-      }
-    })();
+    const saved = readTheme();
     if (saved) document.documentElement.dataset.theme = saved;
-    setDark(saved ? saved === "dark" : window.matchMedia("(prefers-color-scheme: dark)").matches);
   }, []);
   const toggleTheme = () => {
     const next = dark ? "light" : "dark";

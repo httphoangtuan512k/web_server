@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
+import { PlcController } from './plc.controller';
+import { PlcService } from './plc.service';
 
-// TODO(port): khai báo controllers/providers của phân hệ plc.
-@Module({ controllers: [], providers: [], exports: [] })
+@Module({ controllers: [PlcController], providers: [PlcService], exports: [PlcService] })
 export class PlcModule {}

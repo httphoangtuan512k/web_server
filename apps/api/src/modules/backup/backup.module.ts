@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
+import { MaintenanceModule } from '../maintenance/maintenance.module';
+import { BackupController } from './backup.controller';
+import { BackupService } from './backup.service';
 
-// TODO(port): khai báo controllers/providers của phân hệ backup.
-@Module({ controllers: [], providers: [], exports: [] })
+@Module({ imports: [MaintenanceModule], controllers: [BackupController], providers: [BackupService], exports: [BackupService] })
 export class BackupModule {}

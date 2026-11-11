@@ -1,4 +1,8 @@
-// TODO(port): trang ke-hoach – đang được chuyển từ web/ cũ.
+import type { Metadata } from "next";
+import { KeHoachPage } from "./_components/ke-hoach-page";
+
+export const metadata: Metadata = { title: "Kế hoạch sản xuất" };
+
 export default function Page() {
-  return <p className="text-sm text-muted">Đang phát triển…</p>;
+  return <KeHoachPage />;
 }

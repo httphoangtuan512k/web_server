@@ -1,4 +1,8 @@
-// TODO(port): trang van-hanh – đang được chuyển từ web/ cũ.
+import type { Metadata } from "next";
+import { VanHanhPage } from "./_components/van-hanh-view";
+
+export const metadata: Metadata = { title: "Xưởng vận hành" };
+
 export default function Page() {
-  return <p className="text-sm text-muted">Đang phát triển…</p>;
+  return <VanHanhPage />;
 }

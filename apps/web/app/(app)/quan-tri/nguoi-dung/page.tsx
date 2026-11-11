@@ -1,4 +1,8 @@
-// TODO(port): trang quan-tri/nguoi-dung – đang được chuyển từ web/ cũ.
+import type { Metadata } from "next";
+import { UsersPage } from "./_components/users-page";
+
+export const metadata: Metadata = { title: "Người dùng" };
+
 export default function Page() {
-  return <p className="text-sm text-muted">Đang phát triển…</p>;
+  return <UsersPage />;
 }

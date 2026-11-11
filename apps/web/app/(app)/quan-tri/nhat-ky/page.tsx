@@ -1,4 +1,8 @@
-// TODO(port): trang quan-tri/nhat-ky – đang được chuyển từ web/ cũ.
+import type { Metadata } from "next";
+import { LogsPage } from "./_components/logs-page";
+
+export const metadata: Metadata = { title: "Nhật ký hoạt động" };
+
 export default function Page() {
-  return <p className="text-sm text-muted">Đang phát triển…</p>;
+  return <LogsPage />;
 }

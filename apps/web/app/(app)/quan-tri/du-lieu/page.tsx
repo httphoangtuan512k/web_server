@@ -1,4 +1,8 @@
-// TODO(port): trang quan-tri/du-lieu – đang được chuyển từ web/ cũ.
+import type { Metadata } from "next";
+import { SuperDataPage } from "./_components/super-data-page";
+
+export const metadata: Metadata = { title: "Dữ liệu gốc" };
+
 export default function Page() {
-  return <p className="text-sm text-muted">Đang phát triển…</p>;
+  return <SuperDataPage />;
 }

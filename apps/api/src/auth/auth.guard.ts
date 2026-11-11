@@ -38,6 +38,12 @@ export class AuthGuard implements CanActivate {
       .where(and(eq(userSessions.sessionKey, sessionKey), isNull(userSessions.logoutAt), eq(userSessions.userId, payload.uid)))
       .limit(1);
     if (!row) throw new ApiError(401, 'Vui lòng đăng nhập.');
+    if (!row.user.isActive) {
+      // Tài khoản bị khóa: thu hồi phiên ngay, không đợi cookie hết hạn.
+      await this.db.orm.update(userSessions).set({ logoutAt: new Date() }).where(eq(userSessions.sessionKey, sessionKey)).catch(() => undefined);
+      this.sessions.clearCookie(ctx.switchToHttp().getResponse());
+      throw new ApiError(401, 'Tài khoản không hoạt động.');
+    }
     req.user = row.user;
     req.sessionKey = sessionKey;
 

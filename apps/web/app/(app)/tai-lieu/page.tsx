@@ -1,4 +1,8 @@
-// TODO(port): trang tai-lieu – đang được chuyển từ web/ cũ.
+import type { Metadata } from "next";
+import { DocumentsPage } from "./_components/documents-page";
+
+export const metadata: Metadata = { title: "Tài liệu" };
+
 export default function Page() {
-  return <p className="text-sm text-muted">Đang phát triển…</p>;
+  return <DocumentsPage />;
 }

@@ -1,4 +1,8 @@
-// TODO(port): trang plc – đang được chuyển từ web/ cũ.
+import type { Metadata } from "next";
+import { PlcPage } from "./_components/plc-view";
+
+export const metadata: Metadata = { title: "Giám sát PLC" };
+
 export default function Page() {
-  return <p className="text-sm text-muted">Đang phát triển…</p>;
+  return <PlcPage />;
 }

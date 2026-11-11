@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
+import { WarehouseController } from './warehouse.controller';
+import { WarehouseService } from './warehouse.service';
 
-// TODO(port): khai báo controllers/providers của phân hệ warehouse.
-@Module({ controllers: [], providers: [], exports: [] })
+@Module({ controllers: [WarehouseController], providers: [WarehouseService], exports: [WarehouseService] })
 export class WarehouseModule {}

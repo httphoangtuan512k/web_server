@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
+import { SuperDataController } from './super-data.controller';
+import { SuperDataService } from './super-data.service';
 
-// TODO(port): khai báo controllers/providers của phân hệ super-data.
-@Module({ controllers: [], providers: [], exports: [] })
+@Module({ controllers: [SuperDataController], providers: [SuperDataService] })
 export class SuperDataModule {}

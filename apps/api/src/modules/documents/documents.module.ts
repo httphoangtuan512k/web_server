@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
+import { DocumentsController } from './documents.controller';
+import { DocumentsService } from './documents.service';
 
-// TODO(port): khai báo controllers/providers của phân hệ documents.
-@Module({ controllers: [], providers: [], exports: [] })
+@Module({ controllers: [DocumentsController], providers: [DocumentsService] })
 export class DocumentsModule {}

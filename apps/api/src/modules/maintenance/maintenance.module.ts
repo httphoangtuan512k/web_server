@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
+import { MaintenanceController } from './maintenance.controller';
+import { MaintenanceService } from './maintenance.service';
 
-// TODO(port): khai báo controllers/providers của phân hệ maintenance.
-@Module({ controllers: [], providers: [], exports: [] })
+@Module({ controllers: [MaintenanceController], providers: [MaintenanceService], exports: [MaintenanceService] })
 export class MaintenanceModule {}

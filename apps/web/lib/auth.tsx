@@ -48,11 +48,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    let alive = true;
+    api
+      .get<Me>("/api/me")
+      .then((m) => alive && setMe(m))
+      .catch(() => alive && setMe(null))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const logout = useCallback(async () => {
     await api.post("/api/logout").catch(() => undefined);
+    // Tải lại toàn trang để xóa mọi state của phiên cũ.
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = "/login";
   }, []);
 

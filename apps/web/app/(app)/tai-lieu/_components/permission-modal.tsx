@@ -1,0 +1,142 @@
+"use client";
+
+import { Save, Users } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { api, errorMessage } from "@/lib/api";
+import { cn } from "@/lib/cn";
+import { Button } from "@/components/ui/button";
+import { EmptyState, Spinner } from "@/components/ui/card";
+import { SearchInput, Select } from "@/components/ui/form";
+import { Modal } from "@/components/ui/modal";
+import { useToast } from "@/components/ui/toast";
+import type { DocPermission, DocUser, DocumentFile } from "./types";
+
+type Perm = "view" | "edit";
+
+export function PermissionModal({ doc, onClose, onSaved }: { doc: DocumentFile; onClose: () => void; onSaved: () => Promise<void> | void }) {
+  const toast = useToast();
+  const [users, setUsers] = useState<DocUser[] | null>(null);
+  const [grants, setGrants] = useState<Record<number, Perm>>({});
+  const [error, setError] = useState("");
+  const [q, setQ] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    Promise.all([api.get<{ users: DocUser[] }>("/api/tai-lieu/users"), api.get<{ permissions: DocPermission[] }>(`/api/tai-lieu/${doc.id}/permissions`)])
+      .then(([u, p]) => {
+        if (!alive) return;
+        setUsers(u.users || []);
+        setGrants(Object.fromEntries((p.permissions || []).map((x) => [Number(x.user_id), x.permission === "edit" ? "edit" : "view"])));
+      })
+      .catch((e) => alive && setError(errorMessage(e)));
+    return () => {
+      alive = false;
+    };
+  }, [doc.id]);
+
+  const list = useMemo(() => {
+    const k = q.trim().toLowerCase();
+    return (users || [])
+      .filter((u) => u.id !== doc.owner_user_id)
+      .filter((u) => !k || `${u.fullName} ${u.username} ${u.position}`.toLowerCase().includes(k));
+  }, [users, q, doc.owner_user_id]);
+
+  const count = Object.keys(grants).length;
+
+  const toggle = (id: number, on: boolean) =>
+    setGrants((g) => {
+      const n = { ...g };
+      if (on) n[id] = n[id] || "view";
+      else delete n[id];
+      return n;
+    });
+
+  async function save() {
+    setSaving(true);
+    try {
+      const permissions = Object.entries(grants).map(([userId, permission]) => ({ userId: Number(userId), permission }));
+      const r = await api.put<{ ok: boolean; message?: string }>(`/api/tai-lieu/${doc.id}/permissions`, { permissions });
+      toast.success(r?.message || "Đã lưu phân quyền.");
+      onClose();
+      await onSaved();
+    } catch (e) {
+      toast.error(errorMessage(e));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      title="Phân quyền tài liệu"
+      description={doc.original_name}
+      footer={
+        <>
+          <span className="mr-auto self-center text-[13px] text-muted">Đã cấp quyền cho {count} người</span>
+          <Button variant="secondary" onClick={onClose}>
+            Đóng
+          </Button>
+          <Button icon={Save} loading={saving} disabled={!users} onClick={save}>
+            Lưu phân quyền
+          </Button>
+        </>
+      }
+    >
+      <p className="mb-3 text-[13px] text-muted">
+        Bỏ tích = không có quyền (không nhìn thấy tài liệu). Tích chọn rồi chọn quyền <b className="text-fg">Chỉ xem</b> hoặc{" "}
+        <b className="text-fg">Xem và cập nhật</b>.
+      </p>
+      {!users ? (
+        error ? (
+          <p className="py-6 text-center text-sm text-danger-600">{error}</p>
+        ) : (
+          <Spinner />
+        )
+      ) : (
+        <>
+          <SearchInput placeholder="Tìm nhân viên…" value={q} onChange={(e) => setQ(e.target.value)} className="mb-3" />
+          {!list.length ? (
+            <EmptyState icon={Users} title={users.length ? "Không tìm thấy nhân viên phù hợp." : "Không có tài khoản nhân viên hoạt động."} />
+          ) : (
+            <ul className="grid gap-2 sm:grid-cols-2">
+              {list.map((u) => {
+                const granted = u.id in grants;
+                return (
+                  <li
+                    key={u.id}
+                    className={cn("flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors", granted ? "border-brand-200 bg-brand-50/50" : "border-line")}
+                  >
+                    <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3">
+                      <input type="checkbox" className="h-4 w-4 shrink-0 accent-brand-600" checked={granted} onChange={(e) => toggle(u.id, e.target.checked)} />
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium text-fg">{u.fullName}</span>
+                        <span className="block truncate text-xs text-muted">
+                          {u.username}
+                          {u.position ? ` · ${u.position}` : ""}
+                        </span>
+                      </span>
+                    </label>
+                    <Select
+                      aria-label={`Quyền của ${u.fullName}`}
+                      value={grants[u.id] || "view"}
+                      disabled={!granted}
+                      onChange={(e) => setGrants((g) => ({ ...g, [u.id]: e.target.value as Perm }))}
+                      className="h-8 w-[132px] shrink-0 text-[13px]"
+                    >
+                      <option value="view">Chỉ xem</option>
+                      <option value="edit">Xem và cập nhật</option>
+                    </Select>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
+      )}
+    </Modal>
+  );
+}
