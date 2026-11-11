@@ -21,23 +21,35 @@
 web_server/
 ├── apps/api   NestJS 11 (TypeScript) – REST API, deploy thành 1 Vercel project (Root Directory = apps/api)
 │   ├── api/index.js        hàm serverless Vercel, bọc Nest app (cache giữa các lần gọi)
-│   ├── db/schema.sql       schema Postgres (chuyển 1:1 từ SQLite)
-│   ├── scripts/            migrate schema, import dữ liệu SQLite → Neon + ảnh → Blob, tạo super admin
+│   ├── db/migrations/      migration SQL có version (sinh bởi drizzle-kit)
+│   ├── scripts/            migrate, import dữ liệu SQLite → Neon + ảnh → Blob, tạo super admin
 │   └── src/
-│       ├── db/             DbService (pg Pool, hỗ trợ placeholder `?` như SQLite, transaction)
-│       ├── blob/           BlobService (Vercel Blob: put/del/list, đổi data-URL → URL)
-│       ├── auth/           đăng nhập, cookie JWT, Guard: đăng nhập / admin / super / quyền trang
+│       ├── db/             schema.ts (Drizzle – nguồn duy nhất của cấu trúc DB), DbService (Drizzle + SQL thuần, transaction)
+│       ├── blob/           BlobService (store private), /api/files/* (phục vụ ảnh), /api/uploads/token (upload trực tiếp)
+│       ├── auth/           đăng nhập, cookie ký HMAC + bảng user_sessions, Guard: đăng nhập / admin / super / quyền trang
 │       ├── common/         lỗi `{error}`, giờ VN, tiện ích
 │       └── modules/        users, orders, history, maintenance, backup, warehouse,
 │                           super-data, plc, documents, uploads
 └── apps/web   Next.js 16 (TypeScript) – giao diện, deploy thành Vercel project thứ 2 (Root Directory = apps/web)
     ├── next.config.ts      rewrite `/api/*` → API_URL (cùng domain ⇒ cookie hoạt động), redirect `*.html` cũ
     ├── proxy.ts            chưa đăng nhập → về trang đăng nhập
-    └── app/                /, /trangchu, /admin, /log, /superdata, /quanlytailieu,
-                            /kehoach, /vanhanh, /dataplc, /kho, /baotri, /kcs, /xuathang
+    ├── components/ui       design system (Button, Card, Table, Modal, Toast, …) theo màu logo
+    └── app/                /login, / (tổng quan), /ke-hoach, /van-hanh, /plc, /kho, /bao-tri, /kcs, /xuat-hang,
+                            /tai-lieu, /quan-tri/{nguoi-dung,nhat-ky,he-thong,du-lieu}
 ```
 
-**Nguyên tắc quan trọng nhất:** giữ nguyên **đường dẫn API, tham số và dạng JSON trả về** như `server.js`, kể cả mã HTTP và `{ error: "..." }`. Vì vậy frontend port 1:1, và chương trình C# gửi PLC chỉ cần đổi URL.
+**Nguyên tắc:** giữ nguyên **đường dẫn API, tham số và dạng JSON trả về** như `server.js`, kể cả mã HTTP và `{ error: "..." }` (danh sách ngoại lệ trong `PORTING_GUIDE.md` §2.1). Nhờ vậy chương trình C# gửi PLC chỉ cần đổi URL.
+
+## 2b. Thiết kế lại cơ sở dữ liệu
+
+Thay vì chép 1:1 từ SQLite, schema được tối ưu để dễ nâng cấp (chi tiết ánh xạ: `PORTING_GUIDE.md` §4):
+
+- **Drizzle ORM**: schema bằng TypeScript có kiểu, migration có version (`db:generate` → `db:migrate`), không còn `ALTER TABLE` rải trong code khởi động.
+- **Kiểu dữ liệu chuẩn**: `timestamptz` cho thời điểm, `date` cho ngày làm việc, `boolean` cho cờ, `jsonb` cho dữ liệu mềm, `text[]` cho danh sách quyền.
+- **Toàn vẹn**: khóa ngoại thật (`ON DELETE SET NULL/CASCADE`), CHECK cho trạng thái/vai trò/loại hàng, UNIQUE cho snapshot theo ngày.
+- **Gọn hơn**: `order_status_permissions` → `users.order_permissions`; 3 bảng hàng hóa/bao bì/vật tư → `warehouse_items`; PLC gom về `plc_devices`;
+  cột sinh `orders.group_id` thay cho biểu thức `COALESCE(NULLIF(parent_order_id,''),id)` lặp lại khắp nơi; bảng đời cũ không dùng → `legacy_records`.
+- **Tiện vận hành**: trigger tự cập nhật `updated_at`, bảng `app_settings` (key/value) cho cấu hình mới không cần migration, index cho các truy vấn chính.
 
 ## 3. Dịch vụ & biến môi trường
 
@@ -55,8 +67,8 @@ Secret **không bao giờ commit**; chỉ để trong `.env` cục bộ (đã gi
 
 ### Giai đoạn 0 – Nền tảng
 - [x] Clone repo, dựng monorepo `apps/api` + `apps/web`
-- [x] Schema Postgres `db/schema.sql` (TEXT giữ nguyên định dạng ISO, REAL → DOUBLE PRECISION, AUTOINCREMENT → IDENTITY)
-- [x] DbService, BlobService, Auth (cookie JWT + bảng `login_sessions`), Guard phân quyền, filter lỗi
+- [x] Schema Drizzle + migration (mục 2b), áp dụng lên Neon
+- [x] DbService, BlobService, Auth (cookie ký HMAC + bảng `user_sessions`), Guard phân quyền, filter lỗi
 - [x] Upload trực tiếp từ trình duyệt lên Blob qua `/api/uploads/token` (vượt giới hạn 4,5 MB body của Vercel)
 
 ### Giai đoạn 1 – Port backend (giữ nguyên hành vi)
@@ -67,14 +79,16 @@ Secret **không bao giờ commit**; chỉ để trong `.env` cục bộ (đã gi
 - `better-sqlite3` đồng bộ → `pg` bất đồng bộ: mọi `db.transaction` chuyển thành `db.tx(async t => …)`
 
 ### Giai đoạn 2 – Port frontend sang Next.js
-- Mỗi file HTML thành 1 route React (client component), giữ nguyên CSS/bố cục/chữ tiếng Việt
+- **Thiết kế lại** giao diện: design system theo màu logo (xanh/cam), sidebar điều hướng theo quyền, responsive cho điện thoại/tablet ở xưởng, chế độ tối
+- Mỗi file HTML thành 1 route React, giữ đủ 100% chức năng cũ
 - Ảnh: nếu trường có URL thì hiển thị trực tiếp; ảnh mới upload lên Blob hoặc gửi data-URL nhỏ (API tự đẩy lên Blob)
 - `kcs`, `xuathang`: hiện đang trống → làm trang "Đang phát triển"
 
 ### Giai đoạn 3 – Chuyển dữ liệu
-1. `npm run db:migrate` (trong `apps/api`) tạo bảng trên Neon
-2. `npm run db:import -- ../../../web/data/superwhite.db` copy toàn bộ bảng; ảnh base64 → Blob → URL; file Excel tài liệu → Blob
-3. Đối chiếu số dòng từng bảng (script tự in bảng so sánh)
+1. [x] `npm run db:migrate` (trong `apps/api`) tạo bảng trên Neon
+2. [x] `npm run db:import -- <web>/data/superwhite.db --excel-dir <web>/data/excel/files`: chuẩn hóa dữ liệu sang schema mới; ảnh base64 → Blob (tên theo hash, chạy lại không trùng); file Excel → Blob
+3. [x] Đối chiếu số dòng từng bảng (script tự in bảng so sánh) – khớp 100% lần đồng bộ 11/11/2026
+4. [ ] Trước khi chuyển hẳn: dừng server cũ, chạy lại `db:import -- … --wipe` với file `superwhite.db` mới nhất
 
 ### Giai đoạn 4 – Deploy Vercel
 1. Vercel → New Project → import repo → **Root Directory `apps/api`** → thêm biến môi trường → Deploy
