@@ -4,7 +4,7 @@ import { and, eq, isNull } from 'drizzle-orm';
 import type { Request, Response } from 'express';
 import { ApiError } from '../common/api-error';
 import { DbService, schema } from '../db/db.service';
-import { DbUser, isAdminUser, publicUser } from './auth.types';
+import { DbUser, publicUser } from './auth.types';
 import { CurrentUser, Public, SessionKey } from './decorators';
 import { SessionService } from './session.service';
 
@@ -34,7 +34,7 @@ export class AuthController {
       userAgent: String(req.headers['user-agent'] || '').slice(0, 500),
     });
     this.sessions.setCookie(res, this.sessions.sign(user.id, sid));
-    return { ok: true, redirect: isAdminUser(user) ? '/admin' : '/trangchu', user: publicUser(user) };
+    return { ok: true, redirect: '/', user: publicUser(user) };
   }
 
   @Post('logout')

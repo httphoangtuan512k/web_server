@@ -1,0 +1,181 @@
+@import "tailwindcss";
+
+/*
+ * SUPER WHITE design tokens.
+ * Màu thương hiệu lấy từ logo: xanh dương đậm (brand) + cam đất (accent).
+ * Dùng qua tiện ích Tailwind: bg-surface, text-fg, text-muted, border-line, bg-brand-600, text-accent-600, ...
+ */
+:root {
+  --bg: #f4f6fa;
+  --surface: #ffffff;
+  --surface-2: #f8fafc;
+  --surface-3: #eef2f7;
+  --fg: #0f1b2d;
+  --muted: #5b6b80;
+  --subtle: #8a98ab;
+  --line: #e3e8ef;
+  --line-strong: #cfd7e2;
+  --ring: #2f6fd6;
+
+  --brand-50: #eef4ff;
+  --brand-100: #dbe7ff;
+  --brand-200: #b9cff8;
+  --brand-500: #2f6fd6;
+  --brand-600: #1f57b8;
+  --brand-700: #1a4794;
+  --brand-800: #163a76;
+  --brand-900: #0f2a57;
+
+  --accent-50: #fdf3ec;
+  --accent-100: #fbe3d2;
+  --accent-500: #e0874e;
+  --accent-600: #c96f36;
+  --accent-700: #a5572a;
+
+  --success-50: #ecfdf3;
+  --success-600: #16a34a;
+  --success-700: #15803d;
+  --warning-50: #fffbeb;
+  --warning-600: #d97706;
+  --warning-700: #b45309;
+  --danger-50: #fef2f2;
+  --danger-600: #dc2626;
+  --danger-700: #b91c1c;
+  --info-50: #eff6ff;
+  --info-600: #2563eb;
+
+  --sidebar-bg: #0f2a57;
+  --sidebar-fg: #c9d6ee;
+  --sidebar-active: #1f57b8;
+
+  --shadow-card: 0 1px 2px rgb(15 27 45 / 0.04), 0 1px 3px rgb(15 27 45 / 0.06);
+  --shadow-pop: 0 12px 32px -8px rgb(15 27 45 / 0.25), 0 2px 6px rgb(15 27 45 / 0.08);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1220;
+    --surface: #111a2b;
+    --surface-2: #142035;
+    --surface-3: #1a2840;
+    --fg: #e6edf7;
+    --muted: #9aa9bf;
+    --subtle: #6f7f96;
+    --line: #22314a;
+    --line-strong: #2d3f5c;
+    --brand-50: #13233f;
+    --brand-100: #172c50;
+    --accent-50: #2a1c12;
+    --accent-100: #3a2516;
+    --success-50: #0f2a1c;
+    --warning-50: #2b2110;
+    --danger-50: #2e1416;
+    --info-50: #12223f;
+    --sidebar-bg: #0a1424;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
+    --shadow-pop: 0 12px 32px -8px rgb(0 0 0 / 0.6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b1220;
+  --surface: #111a2b;
+  --surface-2: #142035;
+  --surface-3: #1a2840;
+  --fg: #e6edf7;
+  --muted: #9aa9bf;
+  --subtle: #6f7f96;
+  --line: #22314a;
+  --line-strong: #2d3f5c;
+  --brand-50: #13233f;
+  --brand-100: #172c50;
+  --accent-50: #2a1c12;
+  --accent-100: #3a2516;
+  --success-50: #0f2a1c;
+  --warning-50: #2b2110;
+  --danger-50: #2e1416;
+  --info-50: #12223f;
+  --sidebar-bg: #0a1424;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-pop: 0 12px 32px -8px rgb(0 0 0 / 0.6);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: var(--font-be-vietnam), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ring: var(--ring);
+
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+  --color-accent-50: var(--accent-50);
+  --color-accent-100: var(--accent-100);
+  --color-accent-500: var(--accent-500);
+  --color-accent-600: var(--accent-600);
+  --color-accent-700: var(--accent-700);
+  --color-success-50: var(--success-50);
+  --color-success-600: var(--success-600);
+  --color-success-700: var(--success-700);
+  --color-warning-50: var(--warning-50);
+  --color-warning-600: var(--warning-600);
+  --color-warning-700: var(--warning-700);
+  --color-danger-50: var(--danger-50);
+  --color-danger-600: var(--danger-600);
+  --color-danger-700: var(--danger-700);
+  --color-info-50: var(--info-50);
+  --color-info-600: var(--info-600);
+  --color-sidebar: var(--sidebar-bg);
+  --color-sidebar-fg: var(--sidebar-fg);
+  --color-sidebar-active: var(--sidebar-active);
+
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+  --radius-card: 14px;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--fg);
+}
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+/* Số liệu sản lượng: chữ số cùng độ rộng để cột thẳng hàng. */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+::selection {
+  background: var(--brand-100);
+}
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+}

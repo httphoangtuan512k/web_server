@@ -89,7 +89,8 @@ function cleanConnectionString(url: string): string {
   try {
     const u = new URL(url);
     u.searchParams.delete('channel_binding');
-    u.searchParams.set('sslmode', 'verify-full');
+    // pg hiện coi 'require' là 'verify-full'; ghi rõ để tắt cảnh báo. DB local (không sslmode) giữ nguyên.
+    if (u.searchParams.has('sslmode')) u.searchParams.set('sslmode', 'verify-full');
     return u.toString();
   } catch {
     return url;
