@@ -209,7 +209,7 @@ function KeHoach() {
         ) : (
           <>
             <StatCard label="Tổng đơn đang hiển thị" value={counts.all} icon={Layers} tone="accent" hint={`Kế hoạch ${fmtTons(totals.planned)} tấn`} />
-            <StatCard label="Đơn mới tạo" value={counts.new} icon={FilePlus2} tone="brand" hint="Chờ chạy máy" />
+            <StatCard label="Chưa chạy" value={counts.new} icon={FilePlus2} tone="brand" hint="Đơn mới, chờ chạy máy" />
             <StatCard
               label="Đơn đang chạy"
               value={counts.running + counts.paused}

@@ -18,14 +18,24 @@ interface ListProps {
   onOpenImage: (src: string, title: string) => void;
 }
 
+/**
+ * Màu theo trạng thái (quy ước của xưởng):
+ *  - Trắng : chưa chạy (mới tạo)
+ *  - Vàng  : đang chạy (kể cả đang tạm dừng – đơn vẫn dở dang)
+ *  - Xanh  : đã chạy xong (hoàn thành)
+ */
 const rowTint = (g: OrderGroup) => {
   const k = statusKey(g);
-  return k === "running" ? "bg-brand-50/50" : k === "paused" ? "bg-warning-50/60" : undefined;
+  return k === "completed"
+    ? "bg-success-600/12 hover:bg-success-600/18"
+    : k === "running" || k === "paused"
+      ? "bg-yellow-400/25 hover:bg-yellow-400/35"
+      : "bg-surface";
 };
 
 const accent = (g: OrderGroup) => {
   const k = statusKey(g);
-  return k === "running" ? "bg-brand-500" : k === "paused" ? "bg-warning-600" : k === "completed" ? "bg-success-600" : "bg-info-600";
+  return k === "completed" ? "bg-success-600" : k === "running" || k === "paused" ? "bg-yellow-500" : "bg-line-strong";
 };
 
 /** Danh sách đơn: bảng trên desktop (≥ md), thẻ trên điện thoại. Khi in luôn dùng bảng. */

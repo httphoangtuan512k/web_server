@@ -90,9 +90,9 @@ export const statusKey = (o: Pick<Order, "status" | "isPaused">): StatusKey =>
   o.status === "running" ? (o.isPaused ? "paused" : "running") : o.status === "completed" ? "completed" : "new";
 
 export const STATUS_META: Record<StatusKey, { label: string; tone: "info" | "warning" | "neutral" | "success" }> = {
-  new: { label: "Mới tạo", tone: "info" },
+  new: { label: "Chưa chạy", tone: "neutral" },
   running: { label: "Đang chạy", tone: "warning" },
-  paused: { label: "Tạm dừng", tone: "neutral" },
+  paused: { label: "Tạm dừng", tone: "warning" },
   completed: { label: "Hoàn thành", tone: "success" },
 };
 

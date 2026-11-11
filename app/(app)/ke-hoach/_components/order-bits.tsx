@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/card";
 import type { Order } from "./types";
 import { fmtTons, remainingOf, STATUS_META, statusKey, toNum } from "./utils";
 
-/** Badge trạng thái: Mới tạo / Đang chạy / Tạm dừng / Hoàn thành. */
+/** Badge trạng thái: Chưa chạy / Đang chạy / Tạm dừng / Hoàn thành. */
 export function StatusBadge({ order, className }: { order: Pick<Order, "status" | "isPaused">; className?: string }) {
   const key = statusKey(order);
   const meta = STATUS_META[key];
@@ -32,7 +32,7 @@ export function ProductionProgress({
   const produced = toNum(order.actualProduced);
   const pct = qty > 0 ? Math.min(100, (produced / qty) * 100) : produced > 0 ? 100 : 0;
   const key = statusKey(order);
-  const bar = key === "completed" || pct >= 100 ? "bg-success-600" : key === "running" ? "bg-brand-500" : key === "paused" ? "bg-warning-600" : "bg-subtle";
+  const bar = key === "completed" || pct >= 100 ? "bg-success-600" : key === "running" || key === "paused" ? "bg-yellow-500" : "bg-subtle";
   return (
     <div className={cn("min-w-0", className)}>
       <div className="flex items-baseline justify-between gap-2 text-xs">

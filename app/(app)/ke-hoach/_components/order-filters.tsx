@@ -41,7 +41,7 @@ export function OrderFilters({
         className="w-full sm:w-auto"
         items={[
           { value: "all", label: "Tất cả", count: counts.all },
-          { value: "new", label: "Mới tạo", count: counts.new },
+          { value: "new", label: "Chưa chạy", count: counts.new },
           { value: "running", label: "Đang chạy", count: counts.running },
           { value: "paused", label: "Tạm dừng", count: counts.paused },
           { value: "completed", label: "Hoàn thành", count: counts.completed },
