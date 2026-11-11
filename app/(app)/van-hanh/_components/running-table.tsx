@@ -1,10 +1,15 @@
 "use client";
+/**
+ * File này: bảng "Đơn đang chạy" nền vàng (như trang cũ) – sửa Đã chạy/Thực tế, nút Chạy thêm, Tạm dừng, Xác nhận xong.
+ * Dùng ở: trang Xưởng vận hành; máy tính hiện bảng, điện thoại hiện thẻ.
+ */
 
 import { cn } from "@/lib/cn";
 import { fmtNumber } from "@/lib/format";
 import { DraftInput } from "./setting-input";
 import { num, remainingOf, type OperatorPerms, type Order } from "./types";
 
+/** Các hàm xử lý nút/ô nhập trên mỗi đơn (do trang cha truyền vào). */
 export interface OrderHandlers {
   onSplit: (o: Order) => void;
   onPause: (o: Order) => void;
@@ -14,10 +19,12 @@ export interface OrderHandlers {
   onUpdateNum: (o: Order, field: "runOnMachine" | "actualProduced", raw: string) => Promise<boolean>;
 }
 
+// Hiện số thô (không định dạng) trong ô nhập.
 const fmtPlain = (v: number | null | undefined) => String(num(v));
 
 /** Nút theo .btn của trang cũ (chữ trắng đậm 12px, bo 5px). */
 const btn = "inline-block w-full max-w-[160px] cursor-pointer rounded-[5px] px-2.5 py-[7px] text-xs font-bold text-white transition hover:opacity-85 active:scale-[0.98]";
+// Màu nút: Sửa (xanh ngọc), Chạy thêm (tím), Tạm dừng (xanh lá), Xác nhận (xanh đậm).
 const BTN_EDIT = "bg-[#0f766e]";
 const BTN_SPLIT = "bg-[#8b5cf6]";
 const BTN_PLAN = "bg-[#16a34a]";
@@ -26,6 +33,7 @@ const BTN_DONE = "bg-[#065f46]";
 const inlineInput =
   "num w-20 max-w-full rounded border border-[#94a3b8] bg-white p-1.5 text-center font-bold text-[#0f172a] outline-none focus:border-[#2563eb] focus:ring-2 focus:ring-[#2563eb]/20 data-[saved]:bg-[#dcfce7]";
 
+// Tiêu đề cột và độ rộng (px) – đúng thứ tự bảng cũ.
 const HEADERS: Array<[React.ReactNode, number]> = [
   ["Số đơn", 80],
   ["Mã bao bì", 120],
@@ -74,17 +82,20 @@ const HEADERS: Array<[React.ReactNode, number]> = [
  * Máy tính: bảng (cuộn ngang trong khung nếu hẹp). Điện thoại: mỗi đơn một thẻ vàng.
  */
 export function RunningTable({ orders, perms, handlers, loading, error }: { orders: Order[]; perms: OperatorPerms; handlers: OrderHandlers; loading: boolean; error: string }) {
+  // Chữ hiện khi không có dòng nào: lỗi / đang tải / trống.
   const empty = error ? `Lỗi tải danh sách đơn: ${error}` : loading ? "Đang tải danh sách đơn…" : "Hiện không có máy nào đang chạy.";
   return (
     <section className="overflow-hidden rounded-xl border border-[#dbe3ed] bg-white shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
       {/* Máy tính / máy tính bảng */}
       <div className="hidden overflow-x-auto overscroll-x-contain md:block">
         <table className="w-full min-w-[1080px] table-fixed border-collapse text-[13px] text-[#333]">
+          {/* Đặt độ rộng từng cột */}
           <colgroup>
             {HEADERS.map((h, i) => (
               <col key={i} style={{ width: h[1] }} />
             ))}
           </colgroup>
+          {/* Hàng tiêu đề nền xanh navy */}
           <thead>
             <tr>
               {HEADERS.map((h, i) => (
@@ -94,6 +105,7 @@ export function RunningTable({ orders, perms, handlers, loading, error }: { orde
               ))}
             </tr>
           </thead>
+          {/* Mỗi đơn một dòng; không có thì hiện thông báo */}
           <tbody>
             {orders.length ? (
               orders.map((o) => <Row key={o.id} o={o} perms={perms} handlers={handlers} />)
@@ -110,6 +122,7 @@ export function RunningTable({ orders, perms, handlers, loading, error }: { orde
 
       {/* Điện thoại */}
       <div className="md:hidden">
+        {/* Thanh tiêu đề + danh sách thẻ vàng */}
         <div className="bg-[#1e3a8a] px-3 py-2.5 text-sm font-bold text-white">Đơn đang chạy</div>
         {orders.length ? (
           <div className="flex flex-col gap-2 p-2">
@@ -125,11 +138,14 @@ export function RunningTable({ orders, perms, handlers, loading, error }: { orde
   );
 }
 
+// Kiểu ô bảng chung: viền, căn giữa.
 const td = "border border-[#cbd5e1] px-1.5 py-2.5 text-center align-middle break-words";
 
+/** Một dòng bảng (máy tính) cho một đơn. */
 function Row({ o, perms, handlers }: { o: Order; perms: OperatorPerms; handlers: OrderHandlers }) {
   return (
     <tr className="bg-[#fef08a] transition-colors hover:bg-[#fde96b]">
+      {/* Số đơn + nút Sửa toàn bộ (chỉ super) */}
       <td className={td}>
         <b>{o.orderNumber}</b>
         {perms.isSuper ? (
@@ -138,6 +154,7 @@ function Row({ o, perms, handlers }: { o: Order; perms: OperatorPerms; handlers:
           </button>
         ) : null}
       </td>
+      {/* Mã bao bì, ảnh, máy, cỡ hạt, loại đá, độ trắng, tổng SL */}
       <td className={td}>{o.packagingCode || "Không có"}</td>
       <td className={td}>
         <Thumb o={o} onOpen={handlers.onImage} />
@@ -147,12 +164,14 @@ function Row({ o, perms, handlers }: { o: Order; perms: OperatorPerms; handlers:
       <td className={td}>{o.stoneType || "-"}</td>
       <td className={cn(td, "text-xs")}>{o.whiteness || "-"}</td>
       <td className={cn(td, "num")}>{fmtNumber(num(o.quantity))}</td>
+      {/* Ô nhập Đã chạy và Thực tế */}
       <td className={td}>
         <RunInput o={o} perms={perms} handlers={handlers} />
       </td>
       <td className={td}>
         <ActualInput o={o} perms={perms} handlers={handlers} />
       </td>
+      {/* Còn lại (chữ đỏ) và nút thao tác */}
       <td className={cn(td, "num font-bold text-[#dc2626]")}>{fmtNumber(remainingOf(o))}</td>
       <td className={td}>
         <Actions o={o} perms={perms} handlers={handlers} />
@@ -161,9 +180,11 @@ function Row({ o, perms, handlers }: { o: Order; perms: OperatorPerms; handlers:
   );
 }
 
+/** Thẻ vàng cho một đơn (điện thoại). */
 function MobileCard({ o, perms, handlers }: { o: Order; perms: OperatorPerms; handlers: OrderHandlers }) {
   return (
     <article className="rounded-lg border border-[#e5d36a] bg-[#fef08a] p-2.5 text-[13px] text-[#333]">
+      {/* Đầu thẻ: ảnh, số đơn, máy, mã bao bì, nút Sửa */}
       <div className="flex items-start gap-2.5">
         <Thumb o={o} onOpen={handlers.onImage} large />
         <div className="min-w-0 flex-1">
@@ -179,11 +200,13 @@ function MobileCard({ o, perms, handlers }: { o: Order; perms: OperatorPerms; ha
           </button>
         ) : null}
       </div>
+      {/* Thông số: cỡ hạt, loại đá, độ trắng */}
       <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 border-t border-[#e5d36a] pt-2 min-[400px]:grid-cols-3">
         <Info label="Cỡ hạt" value={o.grainSize} />
         <Info label="Loại đá" value={o.stoneType} />
         <Info label="Độ trắng" value={o.whiteness} />
       </dl>
+      {/* 4 ô số: Tổng SL, Đã chạy, Thực tế, Còn lại */}
       <div className="mt-2 grid grid-cols-4 items-end gap-2 border-t border-[#e5d36a] pt-2 text-center">
         <Labeled label="Tổng SL">
           <span className="num block py-1.5 font-semibold">{fmtNumber(num(o.quantity))}</span>
@@ -198,6 +221,7 @@ function MobileCard({ o, perms, handlers }: { o: Order; perms: OperatorPerms; ha
           <span className="num block py-1.5 font-bold text-[#dc2626]">{fmtNumber(remainingOf(o))}</span>
         </Labeled>
       </div>
+      {/* Nút thao tác xếp lưới 2 cột */}
       <div className="mt-2.5 [&_button]:max-w-none">
         <Actions o={o} perms={perms} handlers={handlers} row />
       </div>
@@ -205,6 +229,7 @@ function MobileCard({ o, perms, handlers }: { o: Order; perms: OperatorPerms; ha
   );
 }
 
+/** Ảnh nhỏ của đơn; bấm để phóng to. Không có ảnh → "-". */
 function Thumb({ o, onOpen, large }: { o: Order; onOpen: (o: Order) => void; large?: boolean }) {
   if (!o.imageData) return <span className={large ? "grid h-14 w-14 shrink-0 place-items-center rounded border border-[#e5d36a] bg-white/60 text-[#94a3b8]" : undefined}>-</span>;
   return (
@@ -223,11 +248,13 @@ function Thumb({ o, onOpen, large }: { o: Order; onOpen: (o: Order) => void; lar
   );
 }
 
+/** Ô "Đã chạy": người vận hành sửa được, người khác chỉ xem số. */
 function RunInput({ o, perms, handlers }: { o: Order; perms: OperatorPerms; handlers: OrderHandlers }) {
   if (!perms.canOperate) return <span className="num">{fmtNumber(num(o.runOnMachine))}</span>;
   return <DraftInput aria-label={`Đã chạy (tấn) đơn ${o.orderNumber}`} value={o.runOnMachine} format={fmtPlain} onCommit={(raw) => handlers.onUpdateNum(o, "runOnMachine", raw)} className={inlineInput} />;
 }
 
+/** Ô "Thực tế": chỉ super sửa được (bình thường nhập ở trang Kho). */
 function ActualInput({ o, perms, handlers }: { o: Order; perms: OperatorPerms; handlers: OrderHandlers }) {
   if (!perms.isSuper)
     return (
@@ -238,7 +265,9 @@ function ActualInput({ o, perms, handlers }: { o: Order; perms: OperatorPerms; h
   return <DraftInput aria-label={`Thực tế (tấn) đơn ${o.orderNumber}`} value={o.actualProduced} format={fmtPlain} onCommit={(raw) => handlers.onUpdateNum(o, "actualProduced", raw)} className={inlineInput} />;
 }
 
+/** Nhóm nút: + Chạy thêm, Tạm dừng máy (quyền vận hành), ✔ Xác nhận xong (quyền xác nhận). */
 function Actions({ o, perms, handlers, row }: { o: Order; perms: OperatorPerms; handlers: OrderHandlers; row?: boolean }) {
+  // Không có quyền nào → "Chỉ xem".
   if (!perms.canOperate && !perms.canConfirm) return <span className="text-[#64748b]">Chỉ xem</span>;
   return (
     <div className={row ? "grid grid-cols-2 gap-1.5 [&>*:nth-child(3)]:col-span-2" : "flex flex-col items-center"}>
@@ -261,6 +290,7 @@ function Actions({ o, perms, handlers, row }: { o: Order; perms: OperatorPerms; 
   );
 }
 
+/** Một cặp nhãn – giá trị trong thẻ điện thoại. */
 function Info({ label, value }: { label: string; value: string | null | undefined }) {
   return (
     <div className="min-w-0">
@@ -270,6 +300,7 @@ function Info({ label, value }: { label: string; value: string | null | undefine
   );
 }
 
+/** Nhãn nhỏ phía trên + nội dung bên dưới. */
 function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col items-center gap-1">

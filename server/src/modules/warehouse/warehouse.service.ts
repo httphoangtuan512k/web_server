@@ -1,3 +1,7 @@
+/**
+ * File này: nghiệp vụ Kho – sản lượng nhập theo ngày/đơn, chốt kho cuối ngày, danh mục hàng/bao bì/vật tư, nhập/xuất.
+ * Dùng ở: warehouse.controller.ts (trang /kho); hàm syncOrderProduction còn được module khác gọi.
+ */
 import { HttpException, Injectable } from '@nestjs/common';
 import { displayName } from '../../auth/auth.types';
 import type { DbUser } from '../../auth/auth.types';
@@ -5,12 +9,15 @@ import { ApiError } from '../../common/api-error';
 import { isDateKey, vnDateKey, vnStartOfDay } from '../../common/time';
 import { DbService, Queryable, Row, TxQueryable } from '../../db/db.service';
 
+// Số mili-giây trong 1 ngày.
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Sự kiện vận hành làm đơn xuất hiện trong danh sách Kho của ngày. */
 const RUN_EVENTS = ['Bắt đầu chạy', 'Chạy tiếp', 'Chạy thêm máy'];
 
+// 3 loại danh mục kho: hàng hóa, bao bì, vật tư.
 export type WarehouseCategory = 'goods' | 'packaging' | 'materials';
 const CATEGORIES: WarehouseCategory[] = ['goods', 'packaging', 'materials'];
+// Kiểm tra chuỗi có phải 1 trong 3 loại danh mục.
 const isCategory = (c: string): c is WarehouseCategory => (CATEGORIES as string[]).includes(c);
 
 /** Cột trả về cho từng loại – đúng dạng `SELECT *` của 3 bảng cũ warehouse_goods/packaging/materials. */
@@ -20,6 +27,7 @@ const ITEM_COLUMNS: Record<WarehouseCategory, string> = {
   materials: 'id, shelf_number, name, unit, quantity, updated_at',
 };
 
+/** 1 đơn đã gộp theo nhóm (các đơn chạy tiếp/chạy thêm máy cùng group_id). */
 export interface GroupedOrder {
   key: string;
   orderId: string;
@@ -32,6 +40,7 @@ export interface GroupedOrder {
   status: string;
 }
 
+/** Tổng nhập Kho của 1 đơn trong ngày: sang bao, sản lượng từng máy, danh sách lần nhập. */
 interface EntryTotals {
   repack: number;
   machines: Record<string, number>;
@@ -47,6 +56,7 @@ function vnDayRange(dateKey: string): [Date, Date] {
 /** So sánh nhị phân như SQLite (ORDER BY mặc định). */
 const binCmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
 
+/** Đọc id số nguyên dương hợp lệ; sai → null. */
 function parseIntId(v: unknown): number | null {
   const n = Number(v);
   return Number.isSafeInteger(n) && n > 0 && n <= 2147483647 ? n : null;
@@ -71,6 +81,7 @@ export class WarehouseService {
     if (!this.canEdit(u)) throw new ApiError(403, 'Bạn chưa được cấp quyền chỉnh sửa dữ liệu Kho.');
   }
 
+  /** Tên người thao tác để ghi vào phiếu/nhật ký. */
   actor(u: DbUser): string {
     return u && u.isSuper ? 'Quản trị hệ thống' : (u && (u.fullName || u.username)) || '';
   }
@@ -87,6 +98,7 @@ export class WarehouseService {
     return t.get('SELECT pg_advisory_xact_lock(7202, hashtext(?))', ['warehouse_daily:' + dateKey]);
   }
 
+  /** Ngày đã chốt kho chưa. */
   private async isClosed(q: Queryable, dateKey: string) {
     return !!(await q.get('SELECT 1 AS x FROM warehouse_daily_closings WHERE work_date=?', [dateKey]));
   }
@@ -102,6 +114,7 @@ export class WarehouseService {
     }
   }
 
+  /** Ghi 1 dòng nhật ký thao tác (audit_logs). */
   private audit(q: Queryable, u: DbUser, actor: string, actionType: string, targetId: unknown, orderNumber: string, details: unknown) {
     return q.run(
       'INSERT INTO audit_logs(action_type,target_id,order_number,details,actor,actor_id) VALUES(?,?,?,?::jsonb,?,?)',
@@ -117,15 +130,18 @@ export class WarehouseService {
    * các đơn còn lại trong nhóm = 0. Khóa các dòng đơn của nhóm để tránh ghi chồng khi nhập đồng thời.
    */
   async syncOrderProduction(t: TxQueryable, orderKey: string): Promise<number> {
+    // Lấy & khóa các đơn của nhóm (đơn gốc đứng đầu).
     const key = String(orderKey || '');
     if (!key) return 0;
     const rows = await t.all<{ id: string }>(
       'SELECT id FROM orders WHERE group_id=? ORDER BY CASE WHEN id=? THEN 0 ELSE 1 END, created_at FOR UPDATE',
       [key, key],
     );
+    // Sản lượng = mốc ban đầu (baseline) + tổng phiếu Kho.
     const baseline = Number((await t.get('SELECT baseline_tons FROM warehouse_production_baselines WHERE order_key=?', [key]))?.baseline_tons) || 0;
     const total = await this.entryGrandTotal(t, key);
     const finalTotal = baseline + total;
+    // Dồn toàn bộ sản lượng vào đơn đầu, các đơn khác = 0.
     if (rows.length) {
       await t.run('UPDATE orders SET actual_produced=0 WHERE group_id=?', [key]);
       await t.run('UPDATE orders SET actual_produced=? WHERE id=?', [finalTotal, rows[0].id]);
@@ -147,10 +163,12 @@ export class WarehouseService {
 
   /** = warehouseGroupedOrders: gộp đơn theo group_id (đơn mới nhất của nhóm làm đại diện). */
   async groupedOrders(q: Queryable): Promise<GroupedOrder[]> {
+    // Lấy mọi đơn, mới nhất trước.
     const rows = await q.all(
       `SELECT id, group_id, order_number, packaging_code, grain_size, quantity, actual_produced, machine_name, status
          FROM orders ORDER BY created_at DESC`,
     );
+    // Gộp theo nhóm: đơn đầu tiên gặp (mới nhất) làm đại diện.
     const map = new Map<string, GroupedOrder>();
     for (const o of rows) {
       const key = o.group_id || o.id;
@@ -167,6 +185,7 @@ export class WarehouseService {
           status: o.status,
         });
       }
+      // Cộng dồn: lấy khối lượng đơn lớn nhất, cộng sản lượng, gom tên máy; có đơn đang chạy → nhóm đang chạy.
       const x = map.get(key)!;
       x.orderTotal = Math.max(x.orderTotal, Number(o.quantity) || 0);
       x.producedCumulative += Number(o.actual_produced) || 0;
@@ -181,6 +200,7 @@ export class WarehouseService {
    * các đơn có thao tác Bắt đầu chạy / Chạy tiếp / Chạy thêm máy trong ngày (giờ VN) và các máy tương ứng.
    */
   async dailyRunInfo(q: Queryable, dateKey: string): Promise<{ keys: Set<string>; machines: Map<string, string[]> }> {
+    // Lấy các cặp (đơn, máy) có sự kiện chạy trong ngày.
     const [from, to] = vnDayRange(dateKey);
     const rows = await q.all<{ order_key: string; machine_name: string | null }>(
       `SELECT DISTINCT o.group_id AS order_key, e.machine_name
@@ -188,6 +208,7 @@ export class WarehouseService {
         WHERE e.created_at >= ? AND e.created_at < ? AND e.event_type = ANY(?::text[])`,
       [from, to, RUN_EVENTS],
     );
+    // Gom thành tập mã đơn và danh sách máy (không trùng) cho từng đơn.
     const keys = new Set<string>();
     const machines = new Map<string, string[]>();
     for (const r of rows) {
@@ -197,6 +218,7 @@ export class WarehouseService {
       const name = r.machine_name ?? '';
       if (name.trim() !== '' && !machines.get(r.order_key)!.includes(name)) machines.get(r.order_key)!.push(name);
     }
+    // Sắp xếp tên máy.
     for (const list of machines.values()) list.sort(binCmp);
     return { keys, machines };
   }
@@ -216,6 +238,7 @@ export class WarehouseService {
    * Server cũ tính nhưng không dùng kết quả trong /api/warehouse/daily; giữ lại để tương thích.
    */
   async productionForDate(q: Queryable, dateKey: string): Promise<Map<string, number>> {
+    // Cộng chênh lệch các lần 'Sửa Thực tế' trong ngày theo nhóm đơn.
     const [from, to] = vnDayRange(dateKey);
     const rows = await q.all(
       `SELECT o.group_id AS order_key, SUM(COALESCE(h.new_value,0)-COALESCE(h.old_value,0)) AS produced
@@ -229,6 +252,7 @@ export class WarehouseService {
 
   /** = warehouseDailyEntryTotals. */
   async dailyEntryTotals(q: Queryable, dateKey: string): Promise<Map<string, EntryTotals>> {
+    // Lấy các lần nhập (đầu phiếu) và tổng sản lượng theo máy của từng phiếu trong ngày.
     const headers = await q.all('SELECT * FROM warehouse_daily_entries WHERE work_date=? ORDER BY id', [dateKey]);
     const lines = await q.all(
       `SELECT l.entry_id, l.machine_name, SUM(l.quantity) AS quantity
@@ -236,11 +260,13 @@ export class WarehouseService {
         WHERE h.work_date=? GROUP BY l.entry_id, l.machine_name ORDER BY l.entry_id, l.machine_name`,
       [dateKey],
     );
+    // Gom dòng máy theo phiếu.
     const linesByEntry = new Map<number, Array<{ machine_name: string; quantity: number }>>();
     for (const l of lines) {
       if (!linesByEntry.has(l.entry_id)) linesByEntry.set(l.entry_id, []);
       linesByEntry.get(l.entry_id)!.push({ machine_name: l.machine_name, quantity: Number(l.quantity) || 0 });
     }
+    // Gom theo đơn: cộng sang bao, cộng sản lượng từng máy, lưu danh sách phiếu.
     const byOrder = new Map<string, EntryTotals>();
     for (const h of headers) {
       if (!byOrder.has(h.order_key)) byOrder.set(h.order_key, { repack: 0, machines: {}, entries: [] });
@@ -256,9 +282,11 @@ export class WarehouseService {
   // ---------------------------------------------------------------------------------
   // Routes
   // ---------------------------------------------------------------------------------
+  /** Tổng quan kho: 3 danh mục, 300 giao dịch gần nhất, 365 ngày chốt gần nhất, quyền sửa. */
   async overview(u: DbUser) {
     const items = (category: WarehouseCategory, order: string) =>
       this.db.all(`SELECT ${ITEM_COLUMNS[category]} FROM warehouse_items WHERE category=? ORDER BY ${order}`, [category]);
+    // Chạy song song 5 truy vấn.
     const [goods, packaging, materials, transactions, closingDates] = await Promise.all([
       items('goods', 'lower(name), id'),
       items('packaging', 'lower(name), lot_number, id'),
@@ -269,10 +297,12 @@ export class WarehouseService {
       ),
       this.db.all('SELECT work_date, created_by, closed_at FROM warehouse_daily_closings ORDER BY work_date DESC LIMIT 365'),
     ]);
+    // isAdmin giữ lại cho giao diện cũ, cùng nghĩa với canEdit.
     const canEdit = this.canEdit(u);
     return { isAdmin: canEdit, canEdit, isSuper: Boolean(u && u.isSuper), goods, packaging, materials, transactions, closingDates };
   }
 
+  /** Mỗi ngày đã chốt lấy bản chụp phiên bản mới nhất (DISTINCT ON). */
   async snapshots() {
     try {
       const rows = await this.db.all(
@@ -286,17 +316,21 @@ export class WarehouseService {
     }
   }
 
+  /** Bảng sản lượng Kho của 1 ngày: ngày đã chốt → đọc ảnh chụp; chưa chốt → tính trực tiếp. */
   async daily(dateParam: unknown) {
     const dateKey = this.dateKey(dateParam);
+    // Thông tin chốt ngày và ảnh chụp mới nhất (nếu có).
     const closing = await this.db.get('SELECT * FROM warehouse_daily_closings WHERE work_date=?', [dateKey]);
     const latest = await this.db.get(
       'SELECT * FROM warehouse_daily_snapshots WHERE work_date=? ORDER BY version DESC, id DESC LIMIT 1',
       [dateKey],
     );
+    // Ngày đã chốt và có ảnh chụp → dựng lại số liệu từ ảnh chụp.
     if (closing && latest) {
       const snap: any = latest.snapshot || {};
       // Dữ liệu lịch sử lấy hoàn toàn từ ảnh chụp tại thời điểm chốt, không đọc lại bảng nhập hiện tại.
       const archived = new Map<string, any>();
+      // Gom các lần nhập trong ảnh chụp theo đơn, cộng sang bao và sản lượng máy.
       for (const h of snap.entries || []) {
         if (!archived.has(h.order_key)) archived.set(h.order_key, { order_key: h.order_key, repack: 0, machines: {}, entries: [] });
         const group = archived.get(h.order_key);
@@ -323,6 +357,7 @@ export class WarehouseService {
       return { date: dateKey, closed: true, createdBy: closing.created_by, closedAt: closing.closed_at, rows: lines, suggestions: [], entries: [] };
     }
 
+    // Ngày chưa chốt: lấy thông tin chạy, đơn gộp, tổng nhập trong ngày, tổng sang bao các ngày trước.
     const [run, allOrders, totals, priorRepack] = await Promise.all([
       this.dailyRunInfo(this.db, dateKey),
       this.groupedOrders(this.db),
@@ -334,12 +369,14 @@ export class WarehouseService {
         [dateKey],
       ),
     ]);
+    // Chỉ giữ các đơn có chạy trong ngày, kèm ghi chú từ bảng baseline.
     const picked = allOrders.filter((o) => run.keys.has(o.key));
     const notes = new Map<string, string>();
     if (picked.length) {
       const bl = await this.db.all('SELECT order_key, note FROM warehouse_production_baselines WHERE order_key = ANY(?::text[])', [picked.map((o) => o.key)]);
       for (const b of bl) notes.set(b.order_key, b.note || '');
     }
+    // Danh sách đơn gợi ý để nhập.
     const suggestions = picked.map((o) => ({
       order_key: o.key,
       order_number: o.orderNumber,
@@ -351,6 +388,7 @@ export class WarehouseService {
       note: notes.get(o.key) || '',
       machines: run.machines.get(o.key) ?? [],
     }));
+    // Tính từng dòng: sản lượng hôm nay, cộng dồn, sang bao, còn lại.
     const priorRepackMap = new Map<string, number>(priorRepack.map((x) => [x.order_key, Number(x.total) || 0]));
     const byKey = new Map(allOrders.map((o) => [o.key, o]));
     const rows = suggestions.map((o) => {
@@ -381,6 +419,7 @@ export class WarehouseService {
 
   /** Điều chỉnh trực tiếp sản lượng cộng dồn và ghi chú của đơn hàng tại Kho. */
   async adjustOrderProduction(u: DbUser, keyParam: string, b: any) {
+    // Kiểm tra quyền và dữ liệu nhập.
     this.requireEdit(u);
     b = b || {};
     const key = String(keyParam || '').trim();
@@ -388,15 +427,19 @@ export class WarehouseService {
     const note = String(b.note || '').trim().slice(0, 1000);
     if (!key) throw new ApiError(400, 'Thiếu mã đơn hàng.');
     if (!Number.isFinite(produced) || produced < 0) throw new ApiError(400, 'Khối lượng đã sản xuất phải là số không âm.');
+    // Đơn phải tồn tại.
     const grouped = await this.db.get('SELECT order_number FROM orders WHERE group_id=? ORDER BY created_at DESC LIMIT 1', [key]);
     if (!grouped) throw new ApiError(404, 'Không tìm thấy đơn hàng.');
     const actor = this.actor(u);
+    // Transaction: lỗi lạ được bọc thành 500.
     await this.wrap('Không thể cập nhật sản lượng cộng dồn.', '[KHO] Điều chỉnh sản lượng cộng dồn:', () =>
       this.db.tx(async (t) => {
+        // Khóa các đơn của nhóm.
         const rows = await t.all<{ id: string }>(
           'SELECT id FROM orders WHERE group_id=? ORDER BY CASE WHEN id=? THEN 0 ELSE 1 END, created_at FOR UPDATE',
           [key, key],
         );
+        // Baseline = cộng dồn mong muốn − tổng phiếu Kho (không âm), lưu kèm ghi chú.
         const entryTotal = await this.entryGrandTotal(t, key);
         const baseline = Math.max(0, produced - entryTotal);
         await t.run(
@@ -404,16 +447,19 @@ export class WarehouseService {
            ON CONFLICT(order_key) DO UPDATE SET baseline_tons=excluded.baseline_tons, note=excluded.note`,
           [key, baseline, note],
         );
+        // Ghi sản lượng vào đơn đầu nhóm, các đơn khác = 0.
         if (rows.length) {
           await t.run('UPDATE orders SET actual_produced=0 WHERE group_id=?', [key]);
           await t.run('UPDATE orders SET actual_produced=? WHERE id=?', [produced, rows[0].id]);
         }
+        // Ghi nhật ký.
         await this.audit(t, u, actor, 'ADJUST_WAREHOUSE_CUMULATIVE', key, grouped.order_number, { producedCumulative: produced, note });
       }),
     );
     return { ok: true, producedCumulative: produced, note };
   }
 
+  /** Lọc dòng máy hợp lệ, bỏ dòng sản lượng 0; strict = bắt buộc số hợp lệ. */
   private cleanMachines(machines: any[], strict: boolean, message: string) {
     const cleaned: Array<{ name: string; qty: number }> = [];
     for (const m of machines) {
@@ -425,12 +471,14 @@ export class WarehouseService {
     return cleaned;
   }
 
+  /** Thêm các dòng sản lượng máy cho 1 phiếu. */
   private async insertLines(t: TxQueryable, entryId: number, lines: Array<{ name: string; qty: number }>) {
     for (const m of lines) {
       await t.run('INSERT INTO warehouse_daily_entry_lines(entry_id,machine_name,quantity) VALUES(?,?,?)', [entryId, m.name, m.qty]);
     }
   }
 
+  /** Thêm 1 lần nhập sản lượng (theo máy + sang bao) cho 1 đơn trong ngày. */
   async createDailyEntry(u: DbUser, b: any) {
     this.requireEdit(u);
     b = b || {};
@@ -440,17 +488,21 @@ export class WarehouseService {
     const actor = this.actor(u);
     return this.wrap('Không thể lưu lần nhập.', '[KHO] Lưu nhập sản lượng:', () =>
       this.db.tx(async (t) => {
+        // Khóa ngày, ngày đã chốt thì không nhập thêm (409).
         await this.lockDate(t, dateKey);
         if (await this.isClosed(t, dateKey)) {
           throw new ApiError(409, 'Ngày đã chốt. Không thể nhập thêm; Admin có thể tạo bản chốt mới sau khi điều chỉnh dữ liệu trước khi chốt.');
         }
+        // Đơn phải có chạy trong ngày.
         if (!orderKey) throw new ApiError(400, 'Thiếu đơn hàng.');
         const allowed = await this.suggestedOrderKeys(t, dateKey);
         if (!allowed.has(orderKey)) throw new ApiError(400, 'Đơn hàng không nằm trong danh sách vận hành của ngày đã chọn.');
+        // Kiểm tra sang bao và sản lượng máy, phải có ít nhất 1 số > 0.
         const repack = Number(b.repackQty) || 0;
         if (!Number.isFinite(repack) || repack < 0) throw new ApiError(400, 'Khối lượng sang bao không hợp lệ.');
         const cleaned = this.cleanMachines(Array.isArray(b.machines) ? b.machines : [], false, 'Dữ liệu máy hoặc sản lượng không hợp lệ.');
         if (repack <= 0 && !cleaned.length) throw new ApiError(400, 'Hãy nhập sản lượng ít nhất một máy hoặc khối lượng sang bao.');
+        // Tạo đầu phiếu, thêm dòng máy, cập nhật sản lượng đơn.
         const h = await t.get<{ id: number }>(
           `INSERT INTO warehouse_daily_entries(work_date,order_key,order_number,repack_qty,created_by,created_at)
            VALUES(?,?,?,?,?,?) RETURNING id`,
@@ -463,6 +515,7 @@ export class WarehouseService {
     );
   }
 
+  /** Sửa 1 lần nhập (chỉ khi ngày chưa chốt). */
   async updateDailyEntry(u: DbUser, idParam: string, b: any) {
     this.requireEdit(u);
     b = b || {};
@@ -471,21 +524,26 @@ export class WarehouseService {
     const actor = this.actor(u);
     return this.wrap('Không thể cập nhật lần nhập Kho.', '[KHO] Sửa lần nhập:', () =>
       this.db.tx(async (t) => {
+        // Xem phiếu thuộc ngày nào để khóa ngày đó, rồi khóa phiếu.
         const peek = id ? await t.get('SELECT work_date FROM warehouse_daily_entries WHERE id=?', [id]) : undefined;
         if (!peek) throw new ApiError(404, 'Không tìm thấy lần nhập Kho.');
         await this.lockDate(t, peek.work_date);
         const old = await t.get('SELECT * FROM warehouse_daily_entries WHERE id=? FOR UPDATE', [id]);
         if (!old) throw new ApiError(404, 'Không tìm thấy lần nhập Kho.');
+        // Ngày đã chốt → không sửa.
         if (await this.isClosed(t, old.work_date)) throw new ApiError(409, 'Ngày đã chốt. Không thể sửa bản ghi đã chốt.');
+        // Kiểm tra số liệu mới.
         const repack = Number(b.repackQty);
         if (!Number.isFinite(repack) || repack < 0) throw new ApiError(400, 'Sản lượng sang bao không hợp lệ.');
         if (!Array.isArray(b.machines)) throw new ApiError(400, 'Thiếu danh sách sản lượng máy.');
         const cleaned = this.cleanMachines(b.machines, true, 'Tên máy hoặc sản lượng không hợp lệ.');
         if (repack <= 0 && !cleaned.length) throw new ApiError(400, 'Bản ghi phải có sản lượng máy hoặc sang bao lớn hơn 0.');
+        // Cập nhật đầu phiếu, thay toàn bộ dòng máy, tính lại sản lượng đơn.
         await t.run('UPDATE warehouse_daily_entries SET repack_qty=?, created_by=?, created_at=? WHERE id=?', [repack, actor, now, id]);
         await t.run('DELETE FROM warehouse_daily_entry_lines WHERE entry_id=?', [id]);
         await this.insertLines(t, id!, cleaned);
         const total = await this.syncOrderProduction(t, old.order_key);
+        // Ghi nhật ký.
         await this.audit(t, u, actor, 'EDIT_WAREHOUSE_DAILY_ENTRY', id, old.order_number, {
           workDate: old.work_date,
           repackQty: repack,
@@ -499,6 +557,7 @@ export class WarehouseService {
 
   /** Xóa đúng một lần nhập kho; không ảnh hưởng đơn hàng hoặc sự kiện vận hành. */
   async deleteDailyEntry(u: DbUser, idParam: string) {
+    // Kiểm tra quyền và id.
     this.requireEdit(u);
     const n = Number(idParam);
     if (!Number.isSafeInteger(n) || n <= 0) throw new ApiError(400, 'Mã lần nhập không hợp lệ.');
@@ -506,15 +565,19 @@ export class WarehouseService {
     const actor = this.actor(u);
     return this.wrap('Không thể xóa lần nhập kho.', '[KHO] Xóa lần nhập:', () =>
       this.db.tx(async (t) => {
+        // Khóa ngày của phiếu rồi khóa phiếu.
         const peek = id ? await t.get('SELECT work_date FROM warehouse_daily_entries WHERE id=?', [id]) : undefined;
         if (!peek) throw new ApiError(404, 'Không tìm thấy lần nhập kho.');
         await this.lockDate(t, peek.work_date);
         const entry = await t.get('SELECT * FROM warehouse_daily_entries WHERE id=? FOR UPDATE', [id]);
         if (!entry) throw new ApiError(404, 'Không tìm thấy lần nhập kho.');
+        // Ngày đã chốt → không xóa.
         if (await this.isClosed(t, entry.work_date)) throw new ApiError(409, 'Ngày này đã chốt kho. Không thể xóa bản ghi.');
+        // Giữ lại dòng máy để ghi nhật ký, rồi xóa phiếu.
         const lines = await t.all('SELECT machine_name, quantity FROM warehouse_daily_entry_lines WHERE entry_id=? ORDER BY id', [id]);
         await t.run('DELETE FROM warehouse_daily_entry_lines WHERE entry_id=?', [id]);
         await t.run('DELETE FROM warehouse_daily_entries WHERE id=?', [id]);
+        // Tính lại sản lượng đơn và ghi nhật ký.
         const actual = await this.syncOrderProduction(t, entry.order_key);
         await this.audit(t, u, actor, 'DELETE_WAREHOUSE_DAILY_ENTRY', id, entry.order_number || '', {
           entry,
@@ -534,12 +597,14 @@ export class WarehouseService {
     const actor = this.actor(u);
     return this.wrap('Không thể lưu bản chốt ngày.', '[KHO] Lỗi chốt ngày:', () =>
       this.db.tx(async (t) => {
+        // Khóa ngày, tính số liệu như hàm daily.
         await this.lockDate(t, dateKey);
         const [run, allOrders, totals] = await Promise.all([
           this.dailyRunInfo(t, dateKey),
           this.groupedOrders(t),
           this.dailyEntryTotals(t, dateKey),
         ]);
+        // Đơn có chạy trong ngày.
         const suggestions = allOrders
           .filter((o) => run.keys.has(o.key))
           .map((o) => ({
@@ -553,6 +618,7 @@ export class WarehouseService {
             machines: run.machines.get(o.key) ?? [],
           }));
         const byKey = new Map(allOrders.map((o) => [o.key, o]));
+        // Mỗi dòng: sản lượng hôm nay, cộng dồn, sang bao, còn lại.
         const rows = suggestions.map((o) => {
           const tt = totals.get(o.order_key) || { repack: 0, machines: {}, entries: [] };
           const produced = Object.values(tt.machines).reduce((a, c) => a + c, 0);
@@ -566,6 +632,7 @@ export class WarehouseService {
             remaining: Math.max(0, o.order_total - cumulative),
           };
         });
+        // Danh sách phiếu nhập kèm dòng máy (lưu vào ảnh chụp).
         const headers = await t.all('SELECT * FROM warehouse_daily_entries WHERE work_date=? ORDER BY id', [dateKey]);
         const lineRows = headers.length
           ? await t.all('SELECT entry_id, machine_name, quantity FROM warehouse_daily_entry_lines WHERE entry_id = ANY(?::int[]) ORDER BY id', [headers.map((h) => h.id)])
@@ -575,6 +642,7 @@ export class WarehouseService {
           machines: lineRows.filter((l) => l.entry_id === h.id).map((l) => ({ machine_name: l.machine_name, quantity: l.quantity })),
         }));
 
+        // Có dòng chốt rồi → cập nhật người/giờ chốt; chưa có → tạo mới.
         const existing = await t.get<{ id: number }>('SELECT id FROM warehouse_daily_closings WHERE work_date=? FOR UPDATE', [dateKey]);
         let closingId: number;
         if (existing) {
@@ -587,11 +655,14 @@ export class WarehouseService {
           );
           closingId = ins!.id;
         }
+        // Phiên bản ảnh chụp = lớn nhất hiện có + 1 (chốt lại tạo bản mới).
         const version = (Number((await t.get('SELECT MAX(version) AS v FROM warehouse_daily_snapshots WHERE work_date=?', [dateKey]))?.v) || 0) + 1;
+        // Lưu ảnh chụp dạng jsonb.
         await t.run(
           'INSERT INTO warehouse_daily_snapshots(work_date,version,snapshot,created_by,created_at) VALUES(?,?,?::jsonb,?,?)',
           [dateKey, version, JSON.stringify({ rows, suggestions, entries }), actor, now],
         );
+        // Ghi nhật ký chốt / chốt lại.
         await this.audit(t, u, actor, existing ? 'REClose_WAREHOUSE_DAILY' : 'CLOSE_WAREHOUSE_DAILY', closingId, '', {
           date: dateKey,
           version,
@@ -606,6 +677,7 @@ export class WarehouseService {
   // ---------------------------------------------------------------------------------
   // Danh mục hàng hóa / bao bì / vật tư (bảng warehouse_items theo category)
   // ---------------------------------------------------------------------------------
+  /** Thêm mặt hàng; mỗi loại danh mục có cột riêng (mã/cỡ hạt, số lô, số kệ). */
   async createItem(u: DbUser, b: any) {
     this.requireEdit(u);
     b = b || {};
@@ -613,6 +685,7 @@ export class WarehouseService {
     const name = String(b.name || '').trim();
     if (!isCategory(category) || !name) throw new ApiError(400, 'Thông tin danh mục không hợp lệ.');
     const qty = Number(b.quantity) || 0;
+    // Thêm dòng theo loại; đơn vị mặc định: tấn / bao / cái.
     return this.wrap('Không thể tạo danh mục.', '[KHO] Tạo danh mục:', async () => {
       let row: Row | undefined;
       if (category === 'goods') {
@@ -635,6 +708,7 @@ export class WarehouseService {
     });
   }
 
+  /** Sửa mặt hàng theo loại danh mục. */
   async updateItem(u: DbUser, categoryParam: string, idParam: string, b: any) {
     this.requireEdit(u);
     b = b || {};
@@ -642,6 +716,7 @@ export class WarehouseService {
     if (!isCategory(category)) throw new ApiError(400, 'Loại danh mục không hợp lệ.');
     const id = parseIntId(idParam);
     const qty = Number(b.quantity) || 0;
+    // id hợp lệ mới cập nhật, theo cột riêng của từng loại.
     return this.wrap('Không thể cập nhật danh mục.', '[KHO] Sửa danh mục:', async () => {
       if (id) {
         if (category === 'goods') {
@@ -662,6 +737,7 @@ export class WarehouseService {
     });
   }
 
+  /** Xóa mặt hàng (id sai thì bỏ qua). */
   async deleteItem(u: DbUser, categoryParam: string, idParam: string) {
     this.requireEdit(u);
     const category = String(categoryParam);
@@ -671,8 +747,10 @@ export class WarehouseService {
     return { ok: true };
   }
 
+  /** Nhập (in) hoặc xuất (out) kho 1 mặt hàng, cập nhật tồn và lưu giao dịch. */
   async createTransaction(u: DbUser, b: any) {
     this.requireEdit(u);
+    // Kiểm tra loại, hành động, số lượng > 0.
     b = b || {};
     const category = String(b.category || '');
     const action = String(b.action || '');
@@ -683,10 +761,12 @@ export class WarehouseService {
     const id = parseIntId(b.itemId);
     const actor = displayName(u);
     return this.wrap('Không thể lưu giao dịch kho.', '[KHO] Giao dịch kho:', () =>
+      // Khóa mặt hàng; xuất quá tồn → lỗi.
       this.db.tx(async (t) => {
         const item = id ? await t.get('SELECT * FROM warehouse_items WHERE id=? AND category=? FOR UPDATE', [id, category]) : undefined;
         if (!item) throw new ApiError(404, 'Không tìm thấy mặt hàng.');
         if (action === 'out' && Number(item.quantity) < qty) throw new ApiError(400, 'Số lượng tồn không đủ để xuất.');
+        // Tính tồn mới, cập nhật, lưu giao dịch và nhật ký.
         const next = Number(item.quantity) + (action === 'in' ? qty : -qty);
         await t.run('UPDATE warehouse_items SET quantity=? WHERE id=?', [next, id]);
         await t.run(

@@ -1,4 +1,6 @@
 "use client";
+// File này: bảng "Lịch sử đơn hàng" (50 thay đổi gần nhất), có tìm kiếm; Super Admin được sửa/xóa.
+// Dùng ở: trang Nhật ký, tab thứ hai.
 
 import { useMemo, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
@@ -16,24 +18,30 @@ import type { HistoryRow } from "./types";
 
 /** Lịch sử đơn hàng – GET /api/history (50 bản ghi mới nhất). Sửa/xóa: chỉ Super Admin. */
 export function OrderHistory() {
+  // Người đang đăng nhập; có phải Super Admin không.
   const { me } = useAuth();
   const isSuper = !!me?.isSuper;
   const toast = useToast();
   const confirm = useConfirm();
+  // Tải lịch sử đơn hàng.
   const { data: rows, error, loading, reload } = useApiData<HistoryRow[]>("/api/history");
+  // Ô tìm kiếm và bản ghi đang mở để sửa.
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<HistoryRow | null>(null);
 
+  // Tải lại bảng, lỗi thì báo.
   const refresh = async () => {
     const err = await reload();
     if (err) toast.error(err);
   };
 
+  // Lọc theo từ khóa (số đơn, máy, người, hành động).
   const filtered = useMemo(() => {
     const nq = normalizeText(q.trim());
     return (rows ?? []).filter((r) => matchesQuery(nq, r.order_number, r.machine_name, r.user_name, r.action));
   }, [rows, q]);
 
+  // Xóa bản ghi: hỏi xác nhận, gọi máy chủ, tải lại.
   async function remove(r: HistoryRow) {
     const ok = await confirm({
       title: `Xóa bản ghi lịch sử #${r.id}?`,
@@ -56,9 +64,11 @@ export function OrderHistory() {
     }
   }
 
+  // Số cột bảng (Super Admin có thêm cột "Thao tác").
   const cols = isSuper ? 7 : 6;
   return (
     <>
+      {/* Thanh công cụ: tìm kiếm, nút Làm mới, ghi chú */}
       <div className="mb-4 flex flex-col gap-2.5 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3 sm:mb-5 sm:flex-row sm:items-center">
         <input type="search" className={cn(ogInput, "min-h-[38px]! sm:w-72")} placeholder="Tìm số đơn, máy, người…" value={q} onChange={(e) => setQ(e.target.value)} />
         <OgButton variant="primary" className="self-start font-bold sm:self-auto" loading={loading} onClick={refresh}>
@@ -69,6 +79,7 @@ export function OrderHistory() {
         </span>
       </div>
 
+      {/* Bảng lịch sử */}
       <OgTable maxHeight="70vh" minWidth={isSuper ? 860 : 720}>
         <thead>
           <tr>
@@ -82,6 +93,7 @@ export function OrderHistory() {
           </tr>
         </thead>
         <tbody>
+          {/* Lỗi / đang tải / trống / các dòng */}
           {error && !rows ? (
             <OgEmptyRow colSpan={cols} tone="error">
               {error}
@@ -103,6 +115,7 @@ export function OrderHistory() {
                 <OgTd>
                   <ValueChange oldValue={r.old_value} newValue={r.new_value} />
                 </OgTd>
+                {/* Nút Sửa/Xóa: chỉ Super Admin */}
                 {isSuper ? (
                   <OgTd>
                     <div className="flex gap-1.5">
@@ -120,6 +133,7 @@ export function OrderHistory() {
           )}
         </tbody>
       </OgTable>
+      {/* Hộp sửa bản ghi */}
       {editing ? <HistoryEditModal row={editing} onClose={() => setEditing(null)} onSaved={refresh} /> : null}
     </>
   );

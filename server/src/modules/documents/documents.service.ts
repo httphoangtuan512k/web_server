@@ -1,3 +1,7 @@
+/**
+ * File này: nghiệp vụ tài liệu Excel dùng chung – lưu thông tin file, kiểm quyền, khóa chỉnh sửa, phân quyền, nhật ký.
+ * Dùng ở: documents.controller.ts (trang /tai-lieu); file thật nằm trên Vercel Blob dưới thư mục documents/.
+ */
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import * as path from 'path';
@@ -7,8 +11,10 @@ import type { DbUser } from '../../auth/auth.types';
 import { BlobService } from '../../blob/blob.service';
 import { DbService, Queryable } from '../../db/db.service';
 
+// Thư mục chứa tài liệu trên Blob và dung lượng tối đa 50 MB.
 export const DOC_PREFIX = 'documents/';
 export const DOC_MAX_BYTES = 50 * 1024 * 1024;
+// Đuôi file Excel được chấp nhận và kiểu MIME tương ứng.
 const EXCEL_EXTS = ['.xlsx', '.xlsm', '.xls', '.xlsb'];
 const MIME_BY_EXT: Record<string, string> = {
   '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -16,13 +22,16 @@ const MIME_BY_EXT: Record<string, string> = {
   '.xls': 'application/vnd.ms-excel',
   '.xlsb': 'application/vnd.ms-excel.sheet.binary.macroEnabled.12',
 };
+// Kiểm tra chuỗi có đúng dạng UUID (mã tài liệu).
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const isUuid = (v: unknown): v is string => typeof v === 'string' && UUID_RE.test(v);
 
+// Tiện ích: là Super Admin?, lấy đuôi file, lấy tên file bỏ thư mục.
 const isSuper = (u: DbUser) => !!u.isSuper;
 const extOf = (name: string) => path.extname(String(name || '')).toLowerCase();
 const baseName = (name: string) => path.basename(String(name || '').replace(/\\/g, '/'));
 
+/** 1 dòng bảng documents. */
 export interface DocRow {
   id: string;
   original_name: string;
@@ -36,6 +45,7 @@ export interface DocRow {
   updated_at: Date;
 }
 
+/** Thông tin file đã tải lên Blob sau khi kiểm tra. */
 interface UploadedBlob {
   pathname: string;
   originalName: string;
@@ -56,6 +66,7 @@ export class DocumentsService {
     return u;
   }
 
+  /** Đọc 1 tài liệu chưa xóa; forUpdate = khóa dòng đến hết transaction. */
   private async getDoc(q: Queryable, id: string, forUpdate = false): Promise<DocRow | undefined> {
     if (!isUuid(id)) return undefined;
     return q.get<DocRow>(`SELECT * FROM documents WHERE id = ? AND is_deleted = FALSE${forUpdate ? ' FOR UPDATE' : ''}`, [id]);
@@ -63,11 +74,13 @@ export class DocumentsService {
 
   /** = canAccess() cũ: super → edit; chủ sở hữu → owner; người được chia quyền → view|edit; còn lại → null. */
   async canAccess(id: string, u: DbUser): Promise<{ access: string; file: DocRow } | null> {
+    // Super Admin được sửa mọi tài liệu.
     if (!isUuid(id)) return null;
     if (isSuper(u)) {
       const file = await this.getDoc(this.db, id);
       return file ? { access: 'edit', file } : null;
     }
+    // Người khác: là chủ hoặc có dòng chia quyền.
     const row = await this.db.get<DocRow & { access: string }>(
       `SELECT d.*, CASE WHEN d.owner_id = ? THEN 'owner' ELSE p.permission END AS access
          FROM documents d LEFT JOIN document_permissions p ON p.document_id = d.id AND p.user_id = ?
@@ -89,6 +102,7 @@ export class DocumentsService {
   }
 
   // ------------------------------------------------------------------------------------------
+  /** Danh sách tài liệu: Super Admin thấy tất cả; người khác thấy file của mình hoặc được chia. */
   async list(u: DbUser) {
     const rows = await this.db.all<Record<string, any>>(
       `SELECT d.id, d.original_name, d.owner_id AS owner_user_id, d.owner_name, d.size_bytes, d.created_at, d.updated_at,
@@ -98,6 +112,7 @@ export class DocumentsService {
         ORDER BY d.updated_at DESC`,
       [u.id, isSuper(u), u.id, isSuper(u), u.id, u.id],
     );
+    // version = mốc giờ cập nhật, dùng để phát hiện người khác đã sửa.
     const files = rows.map((f) => ({ ...f, version: new Date(f.updated_at).getTime() }));
     return { files, isSuper: isSuper(u), currentUserId: u.id };
   }
@@ -113,11 +128,13 @@ export class DocumentsService {
   // ------------------------------------------------------------------------------------------
   // File trên Blob (frontend đã upload lên documents/)
   // ------------------------------------------------------------------------------------------
+  /** Tìm blob đúng đường dẫn trên Vercel Blob. */
   private async findBlob(pathname: string) {
     const found = await this.blob.list(pathname);
     return found.find((b) => b.pathname === pathname) || null;
   }
 
+  /** Đường dẫn blob đã gắn với tài liệu nào chưa. */
   private async isReferenced(pathname: string) {
     return !!(await this.db.get('SELECT 1 FROM documents WHERE blob_pathname = ?', [pathname]));
   }
@@ -136,15 +153,18 @@ export class DocumentsService {
    * Lỗi định dạng/kích thước → xóa blob (như multer cũ không giữ lại file bị từ chối).
    */
   private async validateUpload(body: any, msgs: { missing: string; badExt: string }): Promise<UploadedBlob> {
+    // Đường dẫn phải nằm trong documents/, không chứa "..", chưa được dùng.
     const pathname = typeof body?.pathname === 'string' ? body.pathname.trim() : '';
     if (!pathname) throw new ApiError(400, msgs.missing);
     if (!pathname.startsWith(DOC_PREFIX) || pathname.includes('..') || pathname.length > 1024 || pathname.endsWith('/')) {
       throw new ApiError(400, 'Đường dẫn file không hợp lệ.');
     }
     if (await this.isReferenced(pathname)) throw new ApiError(400, 'File này đã được dùng cho một tài liệu khác.');
+    // Tên gốc (tối đa 255 ký tự) và file phải có thật trên Blob.
     const originalName = baseName(typeof body?.originalName === 'string' && body.originalName.trim() ? body.originalName.trim() : pathname).slice(0, 255);
     const found = await this.findBlob(pathname);
     if (!found) throw new ApiError(400, 'Không tìm thấy file đã tải lên. Vui lòng tải lại.');
+    // Sai đuôi Excel hoặc quá 50 MB → xóa blob và báo lỗi.
     const ext = extOf(originalName);
     if (!EXCEL_EXTS.includes(ext) || !EXCEL_EXTS.includes(extOf(pathname))) {
       await this.discardUpload(pathname);
@@ -154,16 +174,19 @@ export class DocumentsService {
       await this.discardUpload(pathname);
       throw new ApiError(400, 'File vượt quá 50 MB.');
     }
+    // Kiểu MIME: dùng kiểu gửi lên nếu hợp lệ, không thì suy từ đuôi file.
     const ct = typeof body?.contentType === 'string' ? body.contentType.trim() : '';
     const mimeType = ct && ct !== 'application/octet-stream' && ct.length < 200 ? ct : MIME_BY_EXT[ext] || 'application/octet-stream';
     return { pathname, originalName, size: found.size, mimeType };
   }
 
+  /** Bước 2 của tải lên: ghi thông tin file (đã nằm trên Blob) vào DB, người tải lên là chủ sở hữu. */
   async upload(u: DbUser, body: any) {
     const up = await this.validateUpload(body, {
       missing: 'Bạn chưa chọn file Excel.',
       badExt: 'Chỉ chấp nhận file Excel .xlsx, .xlsm, .xls hoặc .xlsb.',
     });
+    // Tạo mã tài liệu, lưu dòng documents + nhật ký trong 1 transaction.
     const id = randomUUID();
     try {
       const file = await this.db.tx(async (t) => {
@@ -175,6 +198,7 @@ export class DocumentsService {
         await this.addLog(id, u, 'Tải tài liệu lên', t);
         return row!;
       });
+      // Trả thông tin file để giao diện thêm vào danh sách.
       return {
         ok: true,
         id,
@@ -191,6 +215,7 @@ export class DocumentsService {
           version: new Date(file.updated_at).getTime(),
         },
       };
+    // Lỗi lưu → xóa blob vừa tải để khỏi rác.
     } catch (e) {
       console.error(e);
       await this.discardUpload(up.pathname);
@@ -204,10 +229,12 @@ export class DocumentsService {
       missing: 'Bạn chưa chọn file Excel để cập nhật.',
       badExt: 'File không đúng định dạng Excel (.xlsx, .xlsm, .xls, .xlsb).',
     });
+    // Đường dẫn file cũ và phiên bản mới, gán bên trong transaction.
     let oldPathname = '';
     let version = 0;
     try {
       await this.db.tx(async (t) => {
+        // Đọc & khóa tài liệu kèm quyền của người dùng.
         const f = isUuid(id)
           ? await t.get<DocRow & { access: string | null }>(
               `SELECT d.*, CASE WHEN d.owner_id = ? THEN 'owner' ELSE p.permission END AS access
@@ -216,10 +243,12 @@ export class DocumentsService {
               [u.id, u.id, id],
             )
           : undefined;
+        // Không có tài liệu / không có quyền sửa → lỗi.
         if (!f) throw new ApiError(404, 'Tài liệu không tồn tại hoặc bạn không có quyền truy cập.');
         if (!isSuper(u) && f.owner_id !== u.id && f.access !== 'edit') {
           throw new ApiError(403, 'Bạn chỉ có quyền xem, không được cập nhật tài liệu này.');
         }
+        // Người khác đã cập nhật sau khi mình tải về → 409.
         const currentVersion = new Date(f.updated_at).getTime();
         const expected = body?.expectedVersion;
         if (expected !== undefined && expected !== null && expected !== '' && String(expected) !== String(currentVersion)) {
@@ -233,6 +262,7 @@ export class DocumentsService {
           'SELECT user_id, user_name, lock_token FROM document_locks WHERE document_id = ? AND expires_at > NOW()',
           [id],
         );
+        // Có token khóa → phải đúng khóa của mình; không token → không ai khác đang giữ khóa.
         const lockToken = body?.lockToken;
         if (lockToken !== undefined && lockToken !== null && lockToken !== '') {
           if (!lock || lock.user_id !== u.id || String(lock.lock_token) !== String(lockToken)) {
@@ -241,6 +271,7 @@ export class DocumentsService {
         } else if (lock && lock.user_id !== u.id) {
           throw new ApiError(409, `${lock.user_name || 'Người khác'} đang chỉnh sửa tài liệu này. Bạn chỉ có thể xem.`);
         }
+        // Trỏ tài liệu sang file mới, lấy phiên bản mới.
         oldPathname = f.blob_pathname;
         const r = await t.get<{ updated_at: Date }>(
           `UPDATE documents SET original_name = ?, blob_pathname = ?, mime_type = ?, size_bytes = ?, updated_at = NOW()
@@ -249,12 +280,14 @@ export class DocumentsService {
         );
         version = new Date(r!.updated_at).getTime();
       });
+    // Lỗi → xóa blob mới tải.
     } catch (e) {
       await this.discardUpload(up.pathname);
       if (e instanceof ApiError) throw e;
       console.error(e);
       throw new ApiError(500, 'Không cập nhật được tài liệu.');
     }
+    // Ghi nhật ký và xóa file cũ trên Blob (lỗi chỉ ghi log).
     await this.addLog(id, u, 'Cập nhật tài liệu').catch((err) => console.error('[TAI LIEU] Không ghi được lịch sử cập nhật:', err.message));
     if (oldPathname && oldPathname !== up.pathname) {
       await this.blob.delete(oldPathname).catch((err) => console.error('[TAI LIEU] Không xóa được bản cũ trên Blob:', err?.message || err));
@@ -262,6 +295,7 @@ export class DocumentsService {
     return { ok: true, message: 'Cập nhật tài liệu thành công.', version };
   }
 
+  /** Kiểm quyền xem rồi mở luồng đọc file trên Blob để tải về. */
   async openForDownload(id: string, u: DbUser) {
     const access = await this.canAccess(id, u);
     if (!access) throw new ApiError(404, 'Tài liệu không tồn tại hoặc bạn không có quyền xem.');
@@ -275,6 +309,7 @@ export class DocumentsService {
   // ------------------------------------------------------------------------------------------
   // Phân quyền
   // ------------------------------------------------------------------------------------------
+  /** Danh sách người được chia quyền (chỉ chủ sở hữu / Super Admin). */
   async getPermissions(id: string, u: DbUser) {
     const f = await this.getDoc(this.db, id);
     if (!f) throw new ApiError(404, 'Không tìm thấy tài liệu.');
@@ -288,13 +323,16 @@ export class DocumentsService {
     return { permissions: rows };
   }
 
+  /** Thay toàn bộ phân quyền của tài liệu bằng danh sách mới (view / edit). */
   async setPermissions(id: string, u: DbUser, body: any) {
     const list: any[] = Array.isArray(body?.permissions) ? body.permissions : [];
     try {
       await this.db.tx(async (t) => {
+        // Khóa tài liệu, kiểm tra là chủ sở hữu.
         const f = await this.getDoc(t, id, true);
         if (!f) throw new ApiError(404, 'Không tìm thấy tài liệu.');
         if (!isSuper(u) && f.owner_id !== u.id) throw new ApiError(403, 'Chỉ người tải lên mới được phân quyền.');
+        // Xóa quyền cũ, gom quyền mới (bỏ id sai và chính chủ).
         await t.run('DELETE FROM document_permissions WHERE document_id = ?', [id]);
         const wanted = new Map<number, 'view' | 'edit'>();
         for (const p of list) {
@@ -303,6 +341,7 @@ export class DocumentsService {
           wanted.set(uid, p?.permission === 'edit' ? 'edit' : 'view');
         }
         if (!wanted.size) return;
+        // Chỉ cấp cho tài khoản đang hoạt động, không phải Super Admin.
         const valid = await t.all<{ id: number }>(
           'SELECT id FROM users WHERE id = ANY(?::int[]) AND is_active = TRUE AND is_super = FALSE',
           [[...wanted.keys()]],
@@ -327,11 +366,13 @@ export class DocumentsService {
   // ------------------------------------------------------------------------------------------
   // Khóa chỉnh sửa (3 phút, gia hạn bằng renew)
   // ------------------------------------------------------------------------------------------
+  /** Nhận khóa chỉnh sửa 3 phút; người khác đang giữ khóa còn hạn → 409. */
   async lock(id: string, u: DbUser) {
     const access = await this.canAccess(id, u);
     if (!access) throw new ApiError(404, 'Bạn không có quyền truy cập tài liệu.');
     if (access.access === 'view') throw new ApiError(403, 'Bạn chỉ có quyền xem, không được chỉnh sửa.');
     try {
+      // Chỉ ghi đè khi khóa cũ đã hết hạn hoặc là của chính mình.
       const r = await this.db.get<{ lock_token: string; expires_at: Date }>(
         `INSERT INTO document_locks (document_id, user_id, user_name, lock_token, expires_at)
          VALUES (?, ?, ?, ?, NOW() + INTERVAL '3 minutes')
@@ -341,6 +382,7 @@ export class DocumentsService {
          RETURNING user_id, user_name, lock_token, expires_at`,
         [id, u.id, displayName(u), randomUUID()],
       );
+      // Không lấy được khóa → báo ai đang sửa.
       if (!r) {
         const current = await this.db.get<{ user_name: string }>('SELECT user_name, expires_at FROM document_locks WHERE document_id = ?', [id]);
         throw new ApiError(409, `${current?.user_name || 'Người khác'} đang chỉnh sửa tài liệu này. Bạn chỉ có thể xem.`);
@@ -354,6 +396,7 @@ export class DocumentsService {
     }
   }
 
+  /** Gia hạn khóa thêm 3 phút nếu đúng người giữ và đúng token. */
   async renewLock(id: string, u: DbUser, token: unknown) {
     const r =
       isUuid(id) && isUuid(token)
@@ -367,6 +410,7 @@ export class DocumentsService {
     return { ok: true, expiresAt: r.expires_at };
   }
 
+  /** Nhả khóa (Super Admin nhả được khóa của người khác). */
   async unlock(id: string, u: DbUser) {
     if (!isUuid(id)) return { ok: true, released: false };
     try {
@@ -386,10 +430,12 @@ export class DocumentsService {
   // ------------------------------------------------------------------------------------------
   /** Xóa mềm (is_deleted) như cũ – file trên Blob được giữ lại (server cũ không xóa file). */
   async remove(id: string, u: DbUser) {
+    // Chỉ chủ sở hữu / Super Admin được xóa.
     const f = await this.getDoc(this.db, id);
     if (!f) throw new ApiError(404, 'Không tìm thấy tài liệu.');
     if (!isSuper(u) && f.owner_id !== u.id) throw new ApiError(403, 'Chỉ người tải lên mới được xóa tài liệu.');
     try {
+      // Ghi nhật ký, đánh dấu đã xóa, bỏ khóa.
       await this.db.tx(async (t) => {
         await this.addLog(id, u, 'Xóa tài liệu', t);
         await t.run('UPDATE documents SET is_deleted = TRUE, updated_at = NOW() WHERE id = ?', [id]);
@@ -402,6 +448,7 @@ export class DocumentsService {
     }
   }
 
+  /** 500 thao tác gần nhất trên tài liệu (chỉ chủ sở hữu / Super Admin). */
   async history(id: string, u: DbUser) {
     const f = await this.getDoc(this.db, id);
     if (!f) throw new ApiError(404, 'Không tìm thấy tài liệu.');

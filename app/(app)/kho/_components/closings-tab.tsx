@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: danh sách các ngày đã chốt; bấm một dòng để xem số liệu từng đơn của bản chốt.
+ * Dùng ở: tab "Tổng hợp cuối ngày" khi bấm nút "Lịch sử chốt ngày".
+ */
 
 import { ChevronDown, RefreshCw } from "lucide-react";
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
@@ -10,18 +14,24 @@ import { useToast } from "@/components/ui/toast";
 import { KBtn, KCard, KEmptyRow, KPill, KTable, kInput, kTd, kTh, kTr } from "./kho-ui";
 import { fmtDateKey, num, type DailyResponse, type DailyRow, type SnapshotRow } from "./types";
 
+// Chi tiết một ngày: đang tải?, các dòng, lỗi.
 type Detail = { loading: boolean; rows: DailyRow[]; error?: string };
 
+// Khối lịch sử chốt ngày. onOpenDate = mở ngày đó trong tab tổng hợp.
 export function ClosingsTab({ onOpenDate }: { onOpenDate: (date: string) => void }) {
   const toast = useToast();
+  // Danh sách bản chốt (null = đang tải), lỗi, chữ tìm.
   const [rows, setRows] = useState<SnapshotRow[] | null>(null);
   const [error, setError] = useState("");
   const [q, setQ] = useState("");
+  // Ngày đang mở chi tiết, và chi tiết đã tải của từng ngày.
   const [open, setOpen] = useState<string | null>(null);
   const [details, setDetails] = useState<Record<string, Detail>>({});
 
+  // Gọi API lấy danh sách bản chốt.
   const fetchRows = useCallback(() => api.get<{ rows: SnapshotRow[] }>("/api/warehouse/snapshots"), []);
 
+  // Lần đầu hiện: tải danh sách.
   useEffect(() => {
     let alive = true;
     fetchRows()
@@ -32,6 +42,7 @@ export function ClosingsTab({ onOpenDate }: { onOpenDate: (date: string) => void
     };
   }, [fetchRows]);
 
+  // Nút ⟳: tải lại danh sách, xóa chi tiết cũ.
   async function refresh() {
     try {
       setRows((await fetchRows()).rows || []);
@@ -42,6 +53,7 @@ export function ClosingsTab({ onOpenDate }: { onOpenDate: (date: string) => void
     }
   }
 
+  // Bấm một dòng: mở/đóng; lần đầu mở thì tải chi tiết ngày đó.
   async function toggle(date: string) {
     if (open === date) return setOpen(null);
     setOpen(date);
@@ -55,6 +67,7 @@ export function ClosingsTab({ onOpenDate }: { onOpenDate: (date: string) => void
     }
   }
 
+  // Lọc theo ngày hoặc người chốt.
   const filtered = useMemo(() => {
     const k = q.trim().toLowerCase();
     if (!rows) return [];
@@ -62,6 +75,7 @@ export function ClosingsTab({ onOpenDate }: { onOpenDate: (date: string) => void
     return rows.filter((x) => `${x.work_date} ${fmtDateKey(x.work_date)} ${x.created_by}`.toLowerCase().includes(k));
   }, [rows, q]);
 
+  // Kiểu ô cho bảng chi tiết bên trong.
   const subTh = "border-b border-[#e3eaf2] bg-[#f2f6fa] px-2.5 py-2 text-xs font-bold whitespace-nowrap text-[#294766]";
   const subTd = cn(kTd, "py-2 text-right font-semibold tabular-nums");
 
@@ -70,6 +84,7 @@ export function ClosingsTab({ onOpenDate }: { onOpenDate: (date: string) => void
       title="Lịch sử các lần chốt ngày"
       description="Mỗi ngày hiển thị bản chốt mới nhất. Bấm vào một dòng để xem số liệu theo đơn hàng."
       actions={
+        // Ô tìm kiếm + nút tải lại.
         <>
           <input
             type="search"
@@ -88,6 +103,7 @@ export function ClosingsTab({ onOpenDate }: { onOpenDate: (date: string) => void
       <KTable minWidth={620}>
         <thead>
           <tr>
+            {/* Cột mũi tên, 4 cột thông tin, cột thao tác. */}
             <th className={cn(kTh, "w-9")} />
             {["Ngày", "Lần chốt", "Người chốt", "Thời gian"].map((h) => (
               <th key={h} className={cn(kTh, "text-left")}>
@@ -98,6 +114,7 @@ export function ClosingsTab({ onOpenDate }: { onOpenDate: (date: string) => void
           </tr>
         </thead>
         <tbody>
+          {/* Đang tải/lỗi → thông báo; không có → câu trống; có → mỗi bản chốt một dòng. */}
           {!rows ? (
             <KEmptyRow colSpan={6}>{error ? <span className="text-[#c24141]">{error}</span> : "Đang tải..."}</KEmptyRow>
           ) : !filtered.length ? (
@@ -108,6 +125,7 @@ export function ClosingsTab({ onOpenDate }: { onOpenDate: (date: string) => void
               const d = details[x.work_date];
               return (
                 <Fragment key={`${x.work_date}-${x.version}`}>
+                  {/* Dòng bản chốt: bấm để mở/đóng chi tiết. */}
                   <tr onClick={() => toggle(x.work_date)} className={cn(kTr, "cursor-pointer", isOpen && "bg-[#f8fbfe]")}>
                     <td className={cn(kTd, "pr-0")}>
                       <ChevronDown size={16} className={cn("text-[#66758a] transition-transform", isOpen && "rotate-180")} />
@@ -118,6 +136,7 @@ export function ClosingsTab({ onOpenDate }: { onOpenDate: (date: string) => void
                     </td>
                     <td className={kTd}>{x.created_by || "—"}</td>
                     <td className={cn(kTd, "whitespace-nowrap text-[#66758a]")}>{fmtDateTime(x.created_at)}</td>
+                    {/* Nút "Mở ngày" (không làm mở/đóng dòng). */}
                     <td className={cn(kTd, "text-right")}>
                       <KBtn
                         size="sm"
@@ -131,6 +150,7 @@ export function ClosingsTab({ onOpenDate }: { onOpenDate: (date: string) => void
                       </KBtn>
                     </td>
                   </tr>
+                  {/* Dòng chi tiết (khi mở): bảng sản xuất / sang bao / lũy kế / còn lại theo đơn. */}
                   {isOpen ? (
                     <tr>
                       <td colSpan={6} className="border-b border-[#edf1f5] bg-[#f6faff] px-3 py-3 sm:px-5">

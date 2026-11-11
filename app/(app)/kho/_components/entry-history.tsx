@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: bảng "Lịch sử nhập trong ngày" – từng lần nhập sản lượng, có nút Sửa / Xóa.
+ * Dùng ở: tab "Tổng hợp cuối ngày" của trang /kho. Máy tính hiện bảng, điện thoại hiện thẻ.
+ */
 
 import { Save } from "lucide-react";
 import { useState } from "react";
@@ -12,12 +16,14 @@ import { useToast } from "@/components/ui/toast";
 import { KBtn, KCard, KEmptyRow, KTable, kTd, kTh, kTr } from "./kho-ui";
 import { num, type DailyEntry, type MachineQty } from "./types";
 
+// Một lần nhập kèm số đơn và danh sách máy gợi ý của đơn.
 export interface HistoryEntry extends DailyEntry {
   order_key: string;
   order_number: string;
   suggestionMachines: string[];
 }
 
+// Liệt kê "Máy: số tấn" của một lần nhập.
 function MachineLines({ e }: { e: DailyEntry }) {
   if (!e.machines?.length) return <span className="text-[#66758a]">—</span>;
   return (
@@ -31,6 +37,7 @@ function MachineLines({ e }: { e: DailyEntry }) {
   );
 }
 
+// Khối lịch sử nhập. editable = còn sửa được (có quyền, chưa chốt).
 export function EntryHistory({
   entries,
   editable,
@@ -45,8 +52,10 @@ export function EntryHistory({
 }) {
   const toast = useToast();
   const confirm = useConfirm();
+  // Lần nhập đang mở hộp thoại sửa.
   const [editing, setEditing] = useState<HistoryEntry | null>(null);
 
+  // Nút "Xóa": hỏi xác nhận (kèm chi tiết) → gọi API xóa → tải lại.
   async function remove(e: HistoryEntry) {
     const ok = await confirm({
       title: "Xóa lần nhập kho này?",
@@ -72,6 +81,7 @@ export function EntryHistory({
     });
     if (!ok) return;
     try {
+      // Xóa trên máy chủ.
       await api.delete(`/api/warehouse/daily-entry/${e.id}`);
       toast.success("Đã xóa lần nhập kho. Tổng sản lượng đã được cập nhật lại.");
       await onChanged();
@@ -80,6 +90,7 @@ export function EntryHistory({
     }
   }
 
+  // Nút Sửa / Xóa của mỗi dòng (không sửa được thì hiện "—").
   const actions = (e: HistoryEntry) =>
     editable ? (
       <div className="flex flex-wrap items-center gap-2">
@@ -94,6 +105,7 @@ export function EntryHistory({
       <span className="text-[#66758a]">—</span>
     );
 
+  // Câu thay cho bảng khi đang tải / lỗi / trống.
   const empty = status || (!entries.length ? "Chưa có lần nhập nào trong ngày." : null);
 
   return (
@@ -103,6 +115,7 @@ export function EntryHistory({
         <KTable minWidth={760}>
           <thead>
             <tr>
+              {/* Tiêu đề 6 cột. */}
               {["Thời gian", "Đơn hàng", "Máy / sản lượng", "Sang bao", "Người nhập", "Thao tác"].map((h) => (
                 <th key={h} className={cn(kTh, "text-left")}>
                   {h}
@@ -114,6 +127,7 @@ export function EntryHistory({
             {empty ? (
               <KEmptyRow colSpan={6}>{empty}</KEmptyRow>
             ) : (
+              // Mỗi lần nhập một dòng.
               entries.map((e) => (
                 <tr key={e.id} className={kTr}>
                   <td className={cn(kTd, "whitespace-nowrap")}>{fmtDateTime(e.created_at)}</td>
@@ -139,6 +153,7 @@ export function EntryHistory({
           <p className="rounded-xl border border-[#dce5ef] px-4 py-7 text-center text-[13px] text-[#66758a]">{empty}</p>
         ) : (
           <ul className="space-y-2.5">
+            {/* Mỗi lần nhập một thẻ: số đơn, giờ · người, sang bao, máy. */}
             {entries.map((e) => (
               <li key={e.id} className="rounded-xl border border-[#dce5ef] p-3 text-[13px]">
                 <div className="flex items-start justify-between gap-3">
@@ -161,23 +176,30 @@ export function EntryHistory({
           </ul>
         )}
       </div>
+      {/* Hộp thoại sửa (khi đang sửa). */}
       {editing ? <EditEntryModal entry={editing} onClose={() => setEditing(null)} onSaved={onChanged} /> : null}
     </KCard>
   );
 }
 
+// Hộp thoại sửa một lần nhập: sửa số tấn từng máy và sang bao.
 function EditEntryModal({ entry, onClose, onSaved }: { entry: HistoryEntry; onClose: () => void; onSaved: () => Promise<void> | void }) {
   const toast = useToast();
   const confirm = useConfirm();
+  // Tên các máy (gộp máy gợi ý và máy đã nhập, không trùng).
   const names = [...new Set([...(entry.suggestionMachines || []), ...(entry.machines || []).map((m) => m.machine_name)])];
+  // Số tấn từng máy, điền sẵn số cũ.
   const [qty, setQty] = useState<Record<string, string>>(() =>
     Object.fromEntries(names.map((n) => [n, String(num(entry.machines.find((m) => m.machine_name === n)?.quantity))])),
   );
+  // Sang bao và trạng thái đang lưu.
   const [repack, setRepack] = useState(String(num(entry.repack_qty)));
   const [saving, setSaving] = useState(false);
 
+  // Bấm "Lưu thay đổi": kiểm tra số → hỏi xác nhận → gửi lên máy chủ.
   async function save() {
     const machines: MachineQty[] = [];
+    // Kiểm tra từng máy: số hợp lệ, không âm.
     for (const n of names) {
       const q = Number(qty[n] || 0);
       if (!Number.isFinite(q) || q < 0) return toast.error(`Sản lượng máy ${n} không hợp lệ.`);
@@ -188,6 +210,7 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: HistoryEntry; onCl
     if (!(await confirm({ title: "Lưu thay đổi?", message: "Lưu vào đúng bản ghi cũ. Tổng sản lượng đơn hàng sẽ được tính lại.", confirmText: "Lưu thay đổi" }))) return;
     setSaving(true);
     try {
+      // Ghi đè đúng bản ghi cũ trên máy chủ.
       await api.put(`/api/warehouse/daily-entry/${entry.id}`, { machines, repackQty });
       toast.success("Đã cập nhật bản ghi và đồng bộ sản lượng sang Kế hoạch.");
       onClose();
@@ -208,6 +231,7 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: HistoryEntry; onCl
       description={`Lúc ${fmtDateTime(entry.created_at)} · ${entry.created_by || ""}`}
       footer={
         <>
+          {/* Nút "Hủy" và "Lưu thay đổi". */}
           <Button variant="secondary" onClick={onClose}>
             Hủy
           </Button>
@@ -218,11 +242,13 @@ function EditEntryModal({ entry, onClose, onSaved }: { entry: HistoryEntry; onCl
       }
     >
       <div className="grid grid-cols-2 gap-3">
+        {/* Mỗi máy một ô nhập tấn. */}
         {names.map((n) => (
           <Field key={n} label={`${n} (tấn)`}>
             <Input type="number" inputMode="decimal" min={0} step="0.01" value={qty[n] ?? ""} onChange={(e) => setQty((q) => ({ ...q, [n]: e.target.value }))} />
           </Field>
         ))}
+        {/* Ô sang bao. */}
         <Field label="Sang bao (tấn)">
           <Input type="number" inputMode="decimal" min={0} step="0.01" value={repack} onChange={(e) => setRepack(e.target.value)} />
         </Field>

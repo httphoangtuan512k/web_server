@@ -1,4 +1,6 @@
 "use client";
+// File này: nhật ký hoạt động theo ngày – chọn ngày, lọc theo nguồn, tìm kiếm; bảng (máy tính) / thẻ (điện thoại).
+// Dùng ở: trang Nhật ký, tab đầu tiên.
 
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
@@ -10,14 +12,17 @@ import { matchesQuery, normalizeText, shiftDateKey } from "../../_shared/utils";
 import { ActionBadge, ValueChange } from "./action-badge";
 import { SOURCE_META, type LogItem, type LogsResponse, type LogSource } from "./types";
 
+// Bộ lọc nguồn: tất cả hoặc một nguồn.
 type SourceFilter = "all" | LogSource;
 
+// Màu nhãn cho từng nguồn.
 const SOURCE_CLS: Record<LogSource, string> = {
   history: "bg-[#eaf1f6] text-[#172b3a]",
   event: "bg-[#e8efff] text-[#1746a2]",
   audit: "bg-[#fff7e6] text-[#92400e]",
 };
 
+// Nhãn tròn ghi tên nguồn (Lịch sử đơn / Vận hành / Quản trị).
 function SourceTag({ source }: { source: LogSource }) {
   return (
     <span className={cn("inline-block rounded-full px-2 py-[3px] text-xs whitespace-nowrap", SOURCE_CLS[source] ?? "bg-[#eef2f7] text-[#475569]")}>
@@ -29,31 +34,37 @@ function SourceTag({ source }: { source: LogSource }) {
 /** Nhật ký hoạt động theo ngày – GET /api/logs?date=YYYY-MM-DD. Thanh "Chọn ngày: … Xem dữ liệu" như log.html. */
 export function ActivityLog() {
   const toast = useToast();
+  // Ngày hôm nay, ngày đang xem, bộ lọc nguồn, ô tìm kiếm.
   const [today] = useState(() => todayKey());
   const [date, setDate] = useState(today);
   const [source, setSource] = useState<SourceFilter>("all");
   const [q, setQ] = useState("");
+  // Tải nhật ký của ngày đang chọn (đổi ngày → tự tải lại).
   const { data, error, loading, ready, reload } = useApiData<LogsResponse>(date ? `/api/logs?date=${encodeURIComponent(date)}` : null);
 
   // Chỉ hiển thị dữ liệu đúng ngày đang chọn (tránh nhầm dữ liệu ngày trước trong lúc tải).
   const items = useMemo<LogItem[]>(() => (ready && data?.items ? data.items : []), [data, ready]);
 
+  // Đếm số dòng theo từng nguồn (hiện trên nút lọc).
   const counts = useMemo(() => {
     const c: Record<SourceFilter, number> = { all: items.length, history: 0, event: 0, audit: 0 };
     for (const it of items) c[it.source] = (c[it.source] ?? 0) + 1;
     return c;
   }, [items]);
 
+  // Lọc theo nguồn và từ khóa.
   const filtered = useMemo(() => {
     const nq = normalizeText(q.trim());
     return items.filter((it) => (source === "all" || it.source === source) && matchesQuery(nq, it.actor, it.action, it.orderNumber, it.machineName, it.detail));
   }, [items, source, q]);
 
+  // Nút "Xem dữ liệu": tải lại, lỗi thì báo.
   const refresh = async () => {
     const err = await reload();
     if (err) toast.error(err);
   };
 
+  // Dòng trạng thái: đang tải / số bản ghi tìm thấy.
   const status = error ? "" : !ready ? "Đang tải dữ liệu..." : filtered.length === items.length ? `Tìm thấy ${items.length} bản ghi` : `Hiển thị ${filtered.length} / ${items.length} bản ghi`;
 
   return (
@@ -61,6 +72,7 @@ export function ActivityLog() {
       {/* Thanh công cụ như log.html */}
       <div className="mb-4 flex flex-col gap-3 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-3 sm:mb-5">
         <div className="flex flex-wrap items-center gap-2.5">
+          {/* Chọn ngày: nút ‹ ngày trước, ô ngày, nút › ngày sau */}
           <label htmlFor="log-date" className="font-bold text-[#172b3a]">
             Chọn ngày:
           </label>
@@ -87,9 +99,11 @@ export function ActivityLog() {
               ›
             </OgButton>
           </div>
+          {/* Nút tải lại dữ liệu */}
           <OgButton variant="primary" className="font-bold" loading={loading} onClick={refresh}>
             Xem dữ liệu
           </OgButton>
+          {/* Nút quay về hôm nay (khi đang xem ngày khác) */}
           {date !== today ? (
             <button type="button" onClick={() => setDate(today)} className="text-[13px] font-semibold text-[#244d68] hover:underline">
               Hôm nay
@@ -97,6 +111,7 @@ export function ActivityLog() {
           ) : null}
           <span className="w-full text-sm text-[#64748b] sm:ml-auto sm:w-auto">{status}</span>
         </div>
+        {/* Hàng 2: nút lọc theo nguồn + ô tìm kiếm */}
         <div className="flex flex-col gap-2 border-t border-[#e2e8f0] pt-3 md:flex-row md:items-center">
           <div className="flex flex-wrap gap-1.5">
             {(["all", "history", "event", "audit"] as const).map((v) => (
@@ -141,6 +156,7 @@ export function ActivityLog() {
             </tr>
           </thead>
           <tbody>
+            {/* Lỗi / đang tải / trống / các dòng nhật ký */}
             {error ? (
               <OgEmptyRow colSpan={8} tone="error">
                 {error}
@@ -175,6 +191,7 @@ export function ActivityLog() {
 
       {/* Thẻ – điện thoại */}
       <div className="md:hidden">
+        {/* Lỗi / đang tải / trống / danh sách thẻ */}
         {error ? (
           <OgEmptyBox tone="error">{error}</OgEmptyBox>
         ) : !ready ? (
@@ -185,15 +202,18 @@ export function ActivityLog() {
           <ul className="flex flex-col gap-2">
             {filtered.map((it) => (
               <li key={it.id} className="rounded-lg border border-[#e2e8f0] bg-white p-3">
+                {/* Hành động + giờ */}
                 <div className="flex items-start justify-between gap-2">
                   <ActionBadge action={it.action} />
                   <span className="num shrink-0 text-xs text-[#64748b]">{fmtTime(it.time)}</span>
                 </div>
+                {/* Người thao tác · số đơn · máy */}
                 <p className="mt-2 text-sm">
                   <b>{it.actor || "-"}</b>
                   {it.orderNumber ? <span className="text-[#475569]"> · Đơn {it.orderNumber}</span> : null}
                   {it.machineName ? <span className="text-[#475569]"> · {it.machineName}</span> : null}
                 </p>
+                {/* Thay đổi số lượng và mô tả (nếu có) */}
                 {it.oldValue !== null || it.newValue !== null ? <ValueChange className="mt-1 text-[13px]" oldValue={it.oldValue} newValue={it.newValue} /> : null}
                 {it.detail ? <p className="mt-1 text-[13px] leading-relaxed text-[#475569]">{it.detail}</p> : null}
                 <div className="mt-2">

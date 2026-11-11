@@ -1,3 +1,5 @@
+// File này: khai báo hình dạng dữ liệu bản sao lưu và trạng thái key PLC.
+// Dùng ở: trang Hệ thống.
 /**
  * Một bản sao lưu – GET /api/superadmin/backups → `{ rows: BackupItem[] }`.
  * Server cũ chỉ trả `{ name, createdAt }` (thư mục trên đĩa); bản mới lưu trên Blob nên cần thêm
@@ -12,6 +14,7 @@ export interface BackupItem {
   size?: number;
 }
 
+// Danh sách bản sao lưu trả về.
 export interface BackupListResponse {
   rows: BackupItem[];
 }

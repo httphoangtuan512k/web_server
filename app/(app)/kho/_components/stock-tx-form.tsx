@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: form ghi nhập / xuất kho (chọn mặt hàng, loại giao dịch, số lượng, ghi chú → Lưu).
+ * Dùng ở: tab Hàng hóa / Bao bì / Vật tư và tab Lịch sử nhập / xuất của trang /kho.
+ */
 
 import { useState } from "react";
 import { api, errorMessage } from "@/lib/api";
@@ -7,6 +11,7 @@ import { useToast } from "@/components/ui/toast";
 import { KBtn, KField, kInput } from "./kho-ui";
 import { CATEGORY_LABEL, itemOptionLabel, type ItemCategory, type StockAction, type WarehouseItem } from "./types";
 
+// Chữ nhãn, bước nhảy số, gợi ý ghi chú riêng cho từng loại kho.
 const QTY: Record<ItemCategory, { label: string; step: string; min: string; note: string; item: string }> = {
   goods: { label: "Số lượng (tấn)", step: "0.01", min: "0.01", note: "Nhà cung cấp / khách hàng / nội dung...", item: "Hàng hóa" },
   packaging: { label: "Số lượng (bao)", step: "1", min: "1", note: "Số phiếu / bộ phận nhận...", item: "Loại bao bì / số lô" },
@@ -26,28 +31,36 @@ export function StockTxForm({
   category?: ItemCategory;
   itemsByCategory: Record<ItemCategory, WarehouseItem[]>;
   onSaved: () => Promise<void> | void;
+// Nhóm kho đang chọn (cố định nếu có category).
 }) {
   const toast = useToast();
+  // Danh sách mặt hàng của nhóm kho.
   const [cat, setCat] = useState<ItemCategory>(fixedCategory || "goods");
   const category = fixedCategory || cat;
   const items = itemsByCategory[category] || [];
+  // Giá trị các ô nhập và trạng thái đang lưu.
   const [itemId, setItemId] = useState("");
   const [action, setAction] = useState<StockAction>("in");
   const [quantity, setQuantity] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+  // Mặt hàng đang chọn (mặc định là mặt hàng đầu tiên).
   const cfg = QTY[category];
   const effectiveItemId = items.some((x) => String(x.id) === itemId) ? itemId : items[0] ? String(items[0].id) : "";
   const current = items.find((x) => String(x.id) === effectiveItemId);
 
+  // Bấm Lưu: kiểm tra dữ liệu → gửi lên máy chủ → xóa ô nhập → tải lại.
   async function save(e: React.FormEvent) {
+    // Chặn trình duyệt tự tải lại trang khi gửi form.
     e.preventDefault();
+    // Kiểm tra: có mặt hàng, số lượng > 0, xuất không quá tồn.
     if (!effectiveItemId) return toast.error("Chưa có danh mục. Hãy tạo mặt hàng trước.");
     const q = Number(quantity);
     if (!Number.isFinite(q) || q <= 0) return toast.error("Số lượng phải lớn hơn 0.");
     if (action === "out" && current && q > Number(current.quantity || 0)) return toast.error("Số lượng tồn không đủ để xuất.");
     setSaving(true);
     try {
+      // Gửi phiếu nhập/xuất lên máy chủ.
       await api.post("/api/warehouse/transactions", { category, itemId: effectiveItemId, action, quantity, note });
       toast.success(fixedCategory ? "Đã lưu nhập / xuất kho." : "Đã lưu giao dịch kho.");
       setQuantity("");
@@ -60,6 +73,7 @@ export function StockTxForm({
     }
   }
 
+  // Ô nhập xếp lưới trên điện thoại, xếp một hàng ngang trên màn hình lớn.
   return (
     <form
       onSubmit={save}
@@ -68,11 +82,13 @@ export function StockTxForm({
         fixedCategory && "rounded-[11px] border border-[#e0ebf7] bg-[#f6faff] p-3 sm:p-[15px]",
       )}
     >
+      {/* Ô chọn nhóm kho (chỉ ở tab Lịch sử nhập / xuất). */}
       {!fixedCategory ? (
         <KField label="Nhóm kho" className="lg:min-w-[145px] lg:flex-1">
           <select
             className={kInput}
             value={cat}
+            // Đổi nhóm kho thì bỏ chọn mặt hàng cũ.
             onChange={(e) => {
               setCat(e.target.value as ItemCategory);
               setItemId("");
@@ -86,6 +102,7 @@ export function StockTxForm({
           </select>
         </KField>
       ) : null}
+      {/* Ô chọn mặt hàng (hiện kèm số tồn). */}
       <KField label={fixedCategory ? cfg.item : "Mặt hàng"} className="min-[480px]:col-span-2 lg:min-w-[240px] lg:flex-[1.6]">
         <select className={kInput} value={effectiveItemId} onChange={(e) => setItemId(e.target.value)} disabled={!items.length}>
           {items.length ? (
@@ -99,18 +116,22 @@ export function StockTxForm({
           )}
         </select>
       </KField>
+      {/* Ô chọn Nhập kho / Xuất kho. */}
       <KField label="Loại giao dịch" className="lg:min-w-[145px] lg:flex-1">
         <select className={kInput} value={action} onChange={(e) => setAction(e.target.value as StockAction)}>
           <option value="in">Nhập kho</option>
           <option value="out">Xuất kho</option>
         </select>
       </KField>
+      {/* Ô nhập số lượng. */}
       <KField label={fixedCategory ? cfg.label : `Số lượng${current?.unit ? ` (${current.unit})` : ""}`} className="lg:min-w-[145px] lg:flex-1">
         <input className={kInput} type="number" inputMode="decimal" min={cfg.min} step={cfg.step} value={quantity} onChange={(e) => setQuantity(e.target.value)} required />
       </KField>
+      {/* Ô ghi chú. */}
       <KField label="Ghi chú" className="min-[480px]:col-span-2 lg:min-w-[200px] lg:flex-[1.6]">
         <input className={kInput} placeholder={fixedCategory ? cfg.note : "Nội dung / người nhận..."} value={note} onChange={(e) => setNote(e.target.value)} />
       </KField>
+      {/* Nút xanh lá "Lưu". */}
       <KBtn type="submit" variant="green" loading={saving} disabled={!items.length} className="min-[480px]:col-span-2 lg:col-span-1">
         {fixedCategory ? "Lưu nhập / xuất" : "Lưu giao dịch"}
       </KBtn>

@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: thanh tab dạng nút liền nhau (segmented) để chuyển giữa các nhóm nội dung.
+ * Dùng ở: các trang có nhiều tab (kho, quản trị…).
+ */
 
 import { cn } from "@/lib/cn";
 
@@ -15,8 +19,10 @@ export function Tabs<T extends string>({
   className?: string;
 }) {
   return (
+    // Khung xám bo góc chứa các nút tab; nhiều tab thì cuộn ngang.
     <div role="tablist" className={cn("inline-flex max-w-full gap-1 overflow-x-auto rounded-xl border border-line bg-surface-3 p-1", className)}>
       {items.map((it) => {
+        // Tab đang chọn: nền trắng, có bóng; tab khác chữ xám.
         const active = it.value === value;
         return (
           <button
@@ -30,6 +36,7 @@ export function Tabs<T extends string>({
             )}
           >
             {it.label}
+            {/* Số đếm nhỏ bên cạnh tên tab (nếu có). */}
             {typeof it.count === "number" ? (
               <span className={cn("num rounded-full px-1.5 text-[11px]", active ? "bg-brand-50 text-brand-700" : "bg-surface text-muted")}>{it.count}</span>
             ) : null}

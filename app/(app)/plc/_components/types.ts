@@ -1,5 +1,5 @@
 /**
- * Kiểu dữ liệu trang Giám sát PLC – theo đúng JSON server cũ (`/api/plc/latest`, `/api/plc/history`).
+ * File này: kiểu dữ liệu trang Giám sát PLC – đúng JSON server cũ (`/api/plc/latest`, `/api/plc/history`).
  * Định nghĩa gốc dùng chung với /van-hanh nằm ở `van-hanh/_shared/plc-types.ts`.
  */
 export type {

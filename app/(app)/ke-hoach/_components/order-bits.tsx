@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: các mảnh nhỏ dùng chung trang Kế hoạch – màu dòng, kiểu nút, chữ trạng thái, thanh tiến độ, ảnh thu nhỏ.
+ * Dùng ở: danh sách đơn, chi tiết đơn, thanh công cụ.
+ */
 
 import { Loader2, PauseCircle } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -42,6 +46,7 @@ export const STATUS_TEXT: Record<StatusKey, string> = {
 /** Nút lớn của thanh công cụ / hộp thoại (`.btn.primary` = #1759a6, `.btn.secondary` = #d5dee7). */
 export const BTN_BASE =
   "inline-flex min-h-[38px] items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-[13px] py-2 text-sm font-bold shadow-sm transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100";
+// Nút xanh chính và nút xám phụ.
 export const BTN_PRIMARY = cn(BTN_BASE, "bg-[#1759a6] text-white");
 export const BTN_SECONDARY = cn(BTN_BASE, "bg-[#d5dee7] text-[#1f2a35] shadow-none hover:brightness-95");
 
@@ -55,6 +60,7 @@ export function SmallButton({
   ...rest
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { bg: string; dark?: boolean; loading?: boolean }) {
   return (
+    // Nút nhỏ viền xám, nền theo `bg`, chữ trắng nếu `dark`; có vòng xoay khi loading.
     <button
       type="button"
       {...rest}
@@ -75,8 +81,10 @@ export function SmallButton({
 
 /** Ô "Trạng thái" như trang cũ: Mới tạo / Đang chạy | Tạm dừng + "Còn lại: x tấn" / Hoàn thành. */
 export function StatusText({ order, className }: { order: Pick<Order, "status" | "isPaused" | "quantity" | "actualProduced">; className?: string }) {
+  // Mã trạng thái hiển thị (new/running/paused/completed).
   const key = statusKey(order);
   return (
+    // Dòng 1: chấm cam nhấp nháy (đang chạy) + chữ trạng thái; dòng 2: "Còn lại: x tấn" khi đang chạy.
     <div className={cn("leading-snug", className)}>
       <div className="inline-flex items-center gap-1.5">
         {key === "running" ? <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-[#b45309]" aria-hidden /> : null}
@@ -94,6 +102,7 @@ export function StatusBadge({ order, className }: { order: Pick<Order, "status" 
   const key = statusKey(order);
   const meta = STATUS_META[key];
   return (
+    // Nhãn tròn màu; tạm dừng thì có icon ⏸ thay cho chấm.
     <Badge tone={meta.tone} dot={key !== "paused"} className={cn(key === "running" && "[&>span:first-child]:animate-pulse", className)}>
       {key === "paused" ? <PauseCircle size={12} /> : null}
       {STATUS_TEXT[key]}
@@ -111,12 +120,15 @@ export function ProductionProgress({
   showRemaining?: boolean;
   className?: string;
 }) {
+  // Tính % đã sản xuất (tối đa 100%).
   const qty = toNum(order.quantity);
   const produced = toNum(order.actualProduced);
   const pct = qty > 0 ? Math.min(100, (produced / qty) * 100) : produced > 0 ? 100 : 0;
   const key = statusKey(order);
+  // Màu thanh: xanh lá = xong, vàng = đang chạy/tạm dừng, xám = chưa chạy.
   const bar = key === "completed" || pct >= 100 ? "bg-[#3f9a4a]" : key === "running" || key === "paused" ? "bg-[#e0a800]" : "bg-subtle";
   return (
+    // Dòng số "đã làm / đặt t" + %, bên dưới thanh tiến độ.
     <div className={cn("min-w-0", className)}>
       <div className="flex items-baseline justify-between gap-2 text-xs">
         <span className="num text-fg">
@@ -125,6 +137,7 @@ export function ProductionProgress({
         </span>
         <span className="num text-muted">{Math.round(pct)}%</span>
       </div>
+      {/* Thanh tiến độ: phần màu dài theo %. */}
       <div
         className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-surface-3"
         role="progressbar"
@@ -134,6 +147,7 @@ export function ProductionProgress({
       >
         <div className={cn("h-full rounded-full transition-[width] duration-500", bar)} style={{ width: `${pct}%` }} />
       </div>
+      {/* "Còn lại: x tấn" khi đang chạy. */}
       {showRemaining && order.status === "running" ? <p className="num mt-1 text-xs font-medium text-fg">Còn lại: {fmtTons(remainingOf(order))} tấn</p> : null}
     </div>
   );
@@ -141,8 +155,10 @@ export function ProductionProgress({
 
 /** Ảnh bao bì thu nhỏ như trang cũ (45×40, viền #ccc, nền trắng) – bấm để xem lớn. Không có ảnh → "-". */
 export function OrderThumb({ src, alt, onOpen, className }: { src: string; alt: string; onOpen?: () => void; className?: string }) {
+  // Không có ảnh → hiện dấu "-".
   if (!src) return <span className={cn("inline-block text-[#202832]", className)}>-</span>;
   return (
+    // Ảnh nhỏ 45×40; bấm để xem lớn (không mở chi tiết dòng); rê chuột thì phóng nhẹ.
     <button
       type="button"
       onClick={(e) => {

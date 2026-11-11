@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: ô nhập số tự lưu khi rời ô / Enter (DraftInput).
+ * Dùng ở: ô phễu, tồn silo, hệ số trên sơ đồ SCADA và ô trong bảng vận hành.
+ */
 
 import { useRef, useState } from "react";
 import { cn } from "@/lib/cn";
@@ -26,23 +30,31 @@ export function DraftInput({
   className?: string;
   "aria-label": string;
 }) {
+  // draft: chữ đang gõ (null = không gõ, hiện giá trị thật).
   const [draft, setDraft] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // saved: vừa lưu xong → nháy nền xanh.
   const [saved, setSaved] = useState(false);
+  // Đánh dấu bấm Esc để bỏ lưu.
   const cancelRef = useRef(false);
   const shown = format(value);
 
+  // Lưu giá trị vừa gõ (nếu có thay đổi).
   async function commit() {
     const raw = draft;
     setDraft(null);
+    // Bấm Esc → bỏ qua.
     if (cancelRef.current) {
       cancelRef.current = false;
       return;
     }
+    // Không đổi gì → không lưu.
     if (raw === null || raw.trim() === shown.trim()) return;
+    // Gọi lưu, chờ kết quả.
     setSaving(true);
     const ok = await onCommit(raw);
     setSaving(false);
+    // Lưu được → nền xanh 1,2 giây.
     if (ok) {
       setSaved(true);
       setTimeout(() => setSaved(false), 1200);

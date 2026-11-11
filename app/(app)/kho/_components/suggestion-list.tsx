@@ -1,10 +1,15 @@
 "use client";
+/**
+ * File này: bảng "đơn hàng được gợi ý trong ngày" với nút "＋ Chọn đơn" / "Đã chọn".
+ * Dùng ở: khối đầu tiên của tab "Tổng hợp cuối ngày" (trang /kho).
+ */
 
 import { cn } from "@/lib/cn";
 import { fmtNumber } from "@/lib/format";
 import { KBtn, KEmptyRow, KPill, KTable, kTd, kTh, kTr } from "./kho-ui";
 import type { DailySuggestion } from "./types";
 
+// Chữ và màu nhãn cho từng trạng thái đơn.
 const STATUS: Record<string, { label: string; tone: "green" | "blue" | "amber" | "red" }> = {
   running: { label: "Đang chạy", tone: "green" },
   completed: { label: "Hoàn thành", tone: "blue" },
@@ -12,6 +17,7 @@ const STATUS: Record<string, { label: string; tone: "green" | "blue" | "amber" |
   paused: { label: "Tạm dừng", tone: "amber" },
 };
 
+// Nhãn trạng thái đơn (Đang chạy, Tạm dừng…); trống thì hiện "—".
 export function StatusBadge({ status }: { status: string }) {
   if (!status) return <span className="text-[#66758a]">—</span>;
   const s = STATUS[status];
@@ -33,8 +39,10 @@ function SelectButton({ active, disabled, onClick }: { active: boolean; disabled
   );
 }
 
+// Danh sách máy dạng chữ, hoặc "Chưa xác định máy".
 const machinesText = (x: DailySuggestion) => (x.machines.length ? x.machines.join(", ") : "Chưa xác định máy");
 
+// Bảng đơn gợi ý. selected = các đơn đã chọn; onToggle = bấm chọn/bỏ chọn.
 export function SuggestionList({
   suggestions,
   selected,
@@ -49,12 +57,14 @@ export function SuggestionList({
   /** Đang tải / lỗi – hiện thay cho các dòng. */
   status?: string | null;
 }) {
+  // Câu thay cho bảng khi đang tải / lỗi / không có đơn.
   const empty = status || (!suggestions.length ? "Ngày này không có đơn phát sinh thao tác chạy máy." : null);
   return (
     <>
       {/* Máy tính / máy tính bảng: bảng cột cố định như bản gốc */}
       <div className="hidden md:block">
         <KTable minWidth={820} fixed>
+          {/* Độ rộng 7 cột. */}
           <colgroup>
             <col style={{ width: "9%" }} />
             <col style={{ width: "23%" }} />
@@ -66,6 +76,7 @@ export function SuggestionList({
           </colgroup>
           <thead>
             <tr>
+              {/* Tiêu đề 7 cột. */}
               {["Đơn hàng", "Bao bì", "Cỡ hạt", "Tổng đơn (tấn)", "Máy vận hành trong ngày", "Trạng thái", "Chọn"].map((h) => (
                 <th key={h} className={cn(kTh, "text-center whitespace-normal")}>
                   {h}
@@ -77,6 +88,7 @@ export function SuggestionList({
             {empty ? (
               <KEmptyRow colSpan={7}>{empty}</KEmptyRow>
             ) : (
+              // Mỗi đơn một dòng; đơn đã chọn có nền xanh nhạt.
               suggestions.map((x) => {
                 const active = selected.has(x.order_key);
                 return (
@@ -108,6 +120,7 @@ export function SuggestionList({
           <p className="rounded-xl border border-[#dce5ef] px-4 py-7 text-center text-[13px] text-[#66758a]">{empty}</p>
         ) : (
           <ul className="space-y-2.5">
+            {/* Mỗi đơn một thẻ: số đơn + trạng thái, bao bì · cỡ hạt · tổng, máy, nút chọn. */}
             {suggestions.map((x) => {
               const active = selected.has(x.order_key);
               return (

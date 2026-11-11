@@ -1,7 +1,10 @@
 /**
+ * File này: mô tả hình dạng dữ liệu (kiểu) của đơn hàng, lịch sử, quyền… cho trang Kế hoạch.
+ * Dùng ở: mọi file trong ke-hoach/_components (không hiển thị gì).
  * Kiểu dữ liệu trang Kế hoạch sản xuất – khớp JSON server cũ (`orderFromRow`, `/api/orders*`, `/api/history*`).
  */
 
+// Trạng thái đơn: mới tạo / đang chạy / hoàn thành.
 export type OrderStatus = "new" | "running" | "completed";
 
 /** Một dòng đơn hàng (`orderFromRow`). Đơn chạy thêm máy là dòng con có `parentOrderId` = id đơn gốc. */
@@ -149,5 +152,6 @@ export interface OrderPerms {
   isSuper: boolean;
 }
 
+// Bộ lọc phạm vi (đang hoạt động / lưu trữ) và bộ lọc trạng thái.
 export type ViewFilter = "active" | "history";
 export type StatusFilter = "all" | "new" | "running" | "paused" | "completed";

@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: tab "Lịch sử nhập / xuất" – form ghi giao dịch + danh sách giao dịch có bộ lọc.
+ * Dùng ở: trang /kho. Máy tính hiện bảng, điện thoại hiện thẻ.
+ */
 
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
@@ -7,17 +11,22 @@ import { KCard, KEmptyRow, KPill, KTable, kInput, kTd, kTh, kTr } from "./kho-ui
 import { StockTxForm } from "./stock-tx-form";
 import { CATEGORY_LABEL, type ItemCategory, type WarehouseData, type WarehouseTransaction } from "./types";
 
+// Nhãn xanh "Nhập kho" hoặc đỏ "Xuất kho".
 function ActionBadge({ action }: { action: string }) {
   return action === "in" ? <KPill>Nhập kho</KPill> : <KPill tone="red">Xuất kho</KPill>;
 }
 
+// Đổi mã nhóm kho sang chữ tiếng Việt.
 const catLabel = (c: string) => CATEGORY_LABEL[c as ItemCategory] || c;
 
+// Tab lịch sử giao dịch. onChanged = tải lại sau khi lưu.
 export function TransactionsTab({ data, canEdit, onChanged }: { data: WarehouseData; canEdit: boolean; onChanged: () => Promise<void> | void }) {
+  // Bộ lọc: chữ tìm, nhóm kho, loại giao dịch.
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("");
   const [act, setAct] = useState("");
 
+  // Lọc danh sách giao dịch theo 3 bộ lọc.
   const rows = useMemo(() => {
     const k = q.trim().toLowerCase();
     return data.transactions.filter(
@@ -29,6 +38,7 @@ export function TransactionsTab({ data, canEdit, onChanged }: { data: WarehouseD
 
   return (
     <div className="space-y-[17px]">
+      {/* Có quyền sửa: thẻ form ghi nhập / xuất. */}
       {canEdit ? (
         <KCard title="Ghi nhận nhập / xuất kho" description="Mọi giao dịch được lưu người thực hiện, thời gian và số lượng.">
           <StockTxForm itemsByCategory={{ goods: data.goods, packaging: data.packaging, materials: data.materials }} onSaved={onChanged} />
@@ -38,6 +48,7 @@ export function TransactionsTab({ data, canEdit, onChanged }: { data: WarehouseD
       <KCard
         title="Lịch sử giao dịch"
         description="300 giao dịch gần nhất."
+        // Bộ lọc ở góc phải: ô tìm, chọn nhóm, chọn nhập/xuất.
         actions={
           <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto">
             <input
@@ -69,6 +80,7 @@ export function TransactionsTab({ data, canEdit, onChanged }: { data: WarehouseD
           <KTable minWidth={820}>
             <thead>
               <tr>
+                {/* Tiêu đề 7 cột. */}
                 {["Thời gian", "Nhóm", "Mặt hàng", "Loại", "Số lượng", "Người thực hiện", "Ghi chú"].map((h) => (
                   <th key={h} className={cn(kTh, h === "Số lượng" ? "text-right" : "text-left")}>
                     {h}
@@ -80,6 +92,7 @@ export function TransactionsTab({ data, canEdit, onChanged }: { data: WarehouseD
               {!rows.length ? (
                 <KEmptyRow colSpan={7}>{emptyText}</KEmptyRow>
               ) : (
+                // Mỗi giao dịch một dòng.
                 rows.map((x) => (
                   <tr key={x.id} className={kTr}>
                     <td className={cn(kTd, "whitespace-nowrap")}>{fmtDateTime(x.created_at)}</td>
@@ -104,6 +117,7 @@ export function TransactionsTab({ data, canEdit, onChanged }: { data: WarehouseD
             <p className="rounded-xl border border-[#dce5ef] px-4 py-7 text-center text-[13px] text-[#66758a]">{emptyText}</p>
           ) : (
             <ul className="space-y-2.5">
+              {/* Mỗi giao dịch một thẻ: tên, nhóm · giờ · người, số lượng +/−. */}
               {rows.map((x) => (
                 <li key={x.id} className="rounded-xl border border-[#dce5ef] p-3">
                   <div className="flex items-start justify-between gap-3">
@@ -121,6 +135,7 @@ export function TransactionsTab({ data, canEdit, onChanged }: { data: WarehouseD
                       <ActionBadge action={x.action} />
                     </div>
                   </div>
+                  {/* Ghi chú (nếu có). */}
                   {x.note ? <p className="mt-1 text-[13px] text-[#40546b]">{x.note}</p> : null}
                 </li>
               ))}

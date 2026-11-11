@@ -1,4 +1,6 @@
 "use client";
+// File này: trang Dữ liệu gốc – chọn bảng bên trái, xem/tìm/sửa/xóa bản ghi bên phải.
+// Dùng ở: /quan-tri/du-lieu, chỉ Super Admin.
 
 import { useEffect, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
@@ -16,6 +18,7 @@ import type { SuperRow, SuperTable, SuperTableData } from "./types";
 /** Thẻ trắng theo superdata.html (viền #e5eaf1, bo 13px). */
 const card = "min-w-0 rounded-[13px] border border-[#e5eaf1] bg-white p-4 shadow-[0_3px_12px_rgba(11,27,53,0.03)]";
 
+// Khung trang: nền cũ + chỉ cho Super Admin vào.
 export function SuperDataPage() {
   return (
     <OgScreen>
@@ -26,11 +29,14 @@ export function SuperDataPage() {
   );
 }
 
+// Nội dung chính của trang Dữ liệu gốc.
 function SuperDataContent() {
   const toast = useToast();
   const confirm = useConfirm();
+  // Tải danh sách bảng được phép xem.
   const tablesQ = useApiData<SuperTable[]>("/api/super-data/tables");
   const tables = tablesQ.data;
+  // Bảng đang chọn, chữ đang gõ, từ khóa đã gửi, dòng đang sửa.
   const [selected, setSelected] = useState("");
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
@@ -42,17 +48,21 @@ function SuperDataContent() {
     return () => clearTimeout(t);
   }, [q]);
 
+  // Bảng đang xem (chưa chọn → bảng đầu tiên) và địa chỉ tải dữ liệu.
   const table = selected || tables?.[0]?.name || "";
   const url = table ? `/api/super-data/${encodeURIComponent(table)}?q=${encodeURIComponent(query)}` : null;
+  // Tải dữ liệu bảng; chỉ dùng khi đúng bảng đang chọn.
   const { data, error, loading, ready, reload } = useApiData<SuperTableData>(url);
   const current = data && data.table === table ? data : null;
   const tableLabel = tables?.find((t) => t.name === table)?.label ?? table;
 
+  // Tải lại bảng, lỗi thì báo.
   const refresh = async () => {
     const err = await reload();
     if (err) toast.error(err);
   };
 
+  // Xóa một bản ghi: hỏi xác nhận, gọi máy chủ, tải lại.
   async function remove(row: SuperRow) {
     if (!current) return;
     const ok = await confirm({
@@ -78,6 +88,7 @@ function SuperDataContent() {
 
   return (
     <>
+      {/* Thanh tiêu đề */}
       <PageTopbar
         className={topbarStack}
         title={
@@ -89,15 +100,18 @@ function SuperDataContent() {
       />
 
       <PageBody className="max-w-[1500px]! text-[#172033]">
+        {/* Hộp cảnh báo vàng: sửa ở đây tác động trực tiếp dữ liệu */}
         <div className="mb-3.5 rounded-[9px] border border-[#f5dfac] bg-[#fff8e8] px-3 py-2.5 text-[13px] leading-relaxed text-[#805b16]">
           Chỉ Super Admin truy cập được. Sửa hoặc xóa tại đây tác động trực tiếp đến dữ liệu đang sử dụng (không qua kiểm tra nghiệp vụ, không ghi lịch sử).
           Mật khẩu và cờ định danh Super Admin được bảo vệ, không hiển thị trong bảng này.
         </div>
 
+        {/* Hai cột: danh mục bảng (trái) và dữ liệu (phải); màn hẹp thì xếp dọc */}
         <div className="grid gap-4 min-[850px]:grid-cols-[250px_minmax(0,1fr)]">
           {/* Danh mục bảng */}
           <aside className={cn(card, "min-[850px]:sticky min-[850px]:top-20 min-[850px]:self-start")}>
             <h3 className="mb-3 text-lg font-bold">Danh mục dữ liệu</h3>
+            {/* Lỗi / đang tải / trống / danh sách nút chọn bảng */}
             {tablesQ.error && !tables ? (
               <p className="py-4 text-sm text-[#b42318]">{tablesQ.error}</p>
             ) : !tables ? (
@@ -107,6 +121,7 @@ function SuperDataContent() {
             ) : (
               <nav className="grid grid-cols-2 gap-1.5 min-[850px]:max-h-[calc(100dvh-240px)] min-[850px]:grid-cols-1 min-[850px]:overflow-y-auto">
                 {tables.map((t) => {
+                  // Bảng đang chọn thì nút tô xanh đậm.
                   const active = t.name === table;
                   return (
                     <button
@@ -130,6 +145,7 @@ function SuperDataContent() {
 
           {/* Dữ liệu bảng */}
           <section className={card}>
+            {/* Tên bảng + thông tin khóa chính, số cột */}
             <h2 className="text-xl font-bold sm:text-2xl">{current?.label ?? tableLabel ?? "Chọn danh mục"}</h2>
             <p className="mt-1.5 text-[13px] text-[#64748b]">
               {current
@@ -137,6 +153,7 @@ function SuperDataContent() {
                 : "Chọn một bảng ở bên trái để xem và chỉnh sửa bản ghi."}
             </p>
 
+            {/* Ô tìm kiếm, nút Tải lại, số bản ghi, gợi ý nhấp đúp */}
             <div className="my-3 flex flex-wrap items-center gap-2">
               <input
                 type="search"
@@ -161,6 +178,7 @@ function SuperDataContent() {
               <span className="hidden text-xs text-[#64748b] md:ml-auto md:inline">Nhấp đúp vào ô để sửa</span>
             </div>
 
+            {/* Đang tải / lỗi / không có dữ liệu / bảng dữ liệu (mờ đi khi đang tải lại) */}
             {!table ? (
               <OgEmptyBox>{tables && !tables.length ? "Không có bảng nào được phép truy cập." : "Đang tải..."}</OgEmptyBox>
             ) : error && !ready ? (
@@ -179,6 +197,7 @@ function SuperDataContent() {
         </div>
       </PageBody>
 
+      {/* Hộp sửa bản ghi (khi đang sửa một dòng) */}
       {editing && current ? (
         <RowEditorModal key={JSON.stringify(editing.key)} data={current} row={editing} onClose={() => setEditing(null)} onSaved={refresh} />
       ) : null}

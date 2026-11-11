@@ -1,4 +1,6 @@
 "use client";
+// File này: trang Quản lý tài khoản – form tạo/sửa, danh sách tài khoản, lịch sử đăng nhập.
+// Dùng ở: /quan-tri/nguoi-dung, chỉ quản trị viên vào được.
 
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
@@ -21,6 +23,7 @@ import { UsersList, type UserActions } from "./users-list";
 /** Nút trên thanh tiêu đề trang Quản lý nhân sự: nền trắng chữ tối như admin.html cũ. */
 const whiteTopbarBtn = "max-sm:px-2.5! max-sm:text-[13px]! border-[#cbd5e1]! bg-white! font-normal! text-[#1e293b]! hover:bg-[#edf2f6]!";
 
+// Khung trang: nền cũ + chặn người không phải quản trị viên.
 export function UsersPage() {
   return (
     <OgScreen>
@@ -31,23 +34,32 @@ export function UsersPage() {
   );
 }
 
+// Nội dung chính của trang Người dùng.
 function UsersContent() {
+  // Người đang đăng nhập, hàm báo (toast), hộp xác nhận.
   const { me, logout } = useAuth();
   const toast = useToast();
   const confirm = useConfirm();
+  // Tải danh sách tài khoản.
   const { data: users, error, loading, reload } = useApiData<UserAccount[]>("/api/users");
+  // Ô tìm kiếm và bộ lọc.
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<"" | "active" | "locked" | "admin" | "user">("");
+  // Tài khoản đang sửa (null = đang tạo mới); formKey đổi để làm trống form.
   const [editing, setEditing] = useState<UserAccount | null>(null);
   const [formKey, setFormKey] = useState(0);
+  // Tài khoản đang mở hộp đổi mật khẩu.
   const [pwUser, setPwUser] = useState<UserAccount | null>(null);
+  // Tham chiếu tới form để cuộn lên khi bấm "Sửa".
   const formRef = useRef<HTMLElement>(null);
 
+  // Tải lại danh sách, lỗi thì báo.
   const load = async () => {
     const err = await reload();
     if (err) toast.error(err);
   };
 
+  // Đếm: tổng, đang hoạt động, đã khóa, quản trị viên.
   const stats = useMemo(() => {
     const list = users ?? [];
     return {
@@ -58,6 +70,7 @@ function UsersContent() {
     };
   }, [users]);
 
+  // Lọc danh sách theo bộ lọc và từ khóa.
   const filtered = useMemo(() => {
     const nq = normalizeText(q.trim());
     return (users ?? []).filter((u) => {
@@ -69,18 +82,22 @@ function UsersContent() {
     });
   }, [users, q, filter]);
 
+  // Đưa form về chế độ "Tạo tài khoản mới".
   const resetForm = () => {
     setEditing(null);
     setFormKey((k) => k + 1);
   };
 
+  // Xử lý các nút trên từng tài khoản.
   const actions: UserActions = {
+    // Sửa: nạp tài khoản vào form và cuộn lên form.
     onEdit: (u) => {
       setEditing(u);
       setFormKey((k) => k + 1);
       requestAnimationFrame(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
     },
     onPassword: (u) => setPwUser(u),
+    // Khóa/Mở: khóa thì hỏi xác nhận trước, rồi gọi máy chủ.
     onToggleActive: async (u) => {
       if (u.active) {
         const ok = await confirm({
@@ -92,6 +109,7 @@ function UsersContent() {
         if (!ok) return;
       }
       try {
+        // Gửi trạng thái mới, báo kết quả, tải lại danh sách.
         await api.patch(`/api/users/${u.id}/active`, { active: !u.active });
         toast.success(u.active ? `Đã khóa tài khoản ${u.username}.` : `Đã mở khóa tài khoản ${u.username}.`);
         await load();
@@ -99,6 +117,7 @@ function UsersContent() {
         toast.error(errorMessage(e));
       }
     },
+    // Xóa: hỏi xác nhận, xóa trên máy chủ, tải lại danh sách.
     onDelete: async (u) => {
       const ok = await confirm({
         title: `Xóa tài khoản ${u.username}?`,
@@ -115,6 +134,7 @@ function UsersContent() {
       try {
         await api.delete(`/api/users/${u.id}`);
         toast.success(`Đã xóa tài khoản ${u.username}.`);
+        // Nếu đang sửa đúng tài khoản này thì làm trống form.
         if (editing?.id === u.id) resetForm();
         await load();
       } catch (e) {
@@ -125,6 +145,7 @@ function UsersContent() {
 
   return (
     <>
+      {/* Thanh tiêu đề: Trang chủ, Chỉnh sửa dữ liệu (Super Admin), Đăng xuất */}
       <PageTopbar
         title="SUPER WHITE"
         subtitle="QUẢN LÝ TÀI KHOẢN VÀ HỒ SƠ NHÂN VIÊN"
@@ -147,7 +168,9 @@ function UsersContent() {
         }
       />
 
+      {/* Phần thân trang */}
       <PageBody className="flex max-w-[1250px]! flex-col gap-4 sm:gap-5">
+        {/* Form tạo/sửa tài khoản (key đổi → form làm mới) */}
         <AccountForm
           key={`${editing?.id ?? "new"}-${formKey}`}
           ref={formRef}
@@ -159,6 +182,7 @@ function UsersContent() {
           }}
         />
 
+        {/* Thẻ "Danh sách tài khoản" */}
         <OgCard>
           <OgCardTitle
             title="Danh sách tài khoản"
@@ -178,6 +202,7 @@ function UsersContent() {
             }
             className="mb-3.5!"
           />
+          {/* Hàng tìm kiếm + bộ lọc + số đang hiển thị */}
           <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center">
             <input
               type="search"
@@ -200,6 +225,7 @@ function UsersContent() {
             ) : null}
           </div>
 
+          {/* Lỗi / đang tải / trống / danh sách */}
           {error && !users ? (
             <OgEmptyBox tone="error">{error}</OgEmptyBox>
           ) : !users ? (
@@ -211,8 +237,10 @@ function UsersContent() {
           )}
         </OgCard>
 
+        {/* Lịch sử đăng nhập: chỉ Super Admin thấy */}
         {me?.isSuper ? <LoginSessions /> : null}
 
+        {/* Liên kết xem thêm ở cuối trang */}
         <p className="pb-2 text-center text-xs text-[#64748b]">
           Xem thêm:{" "}
           <Link href="/quan-tri/nhat-ky" className="font-semibold text-[#244d68] hover:underline">
@@ -229,6 +257,7 @@ function UsersContent() {
         </p>
       </PageBody>
 
+      {/* Hộp đổi mật khẩu (khi đã chọn tài khoản) */}
       {pwUser ? <PasswordModal user={pwUser} onClose={() => setPwUser(null)} /> : null}
     </>
   );

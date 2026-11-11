@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: ô chọn/chụp ảnh – xem trước ảnh, nút "Thêm ảnh"/"Đổi ảnh", link "Gỡ ảnh".
+ * Dùng ở: form đơn hàng, bảo trì, ảnh đại diện.
+ */
 
 import { ImagePlus, Loader2, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
@@ -26,10 +30,13 @@ export function ImageInput({
   className?: string;
   disabled?: boolean;
 }) {
+  // ref = trỏ tới ô chọn file ẩn; busy = đang tải ảnh lên.
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  // Hàm hiện thông báo nhỏ.
   const toast = useToast();
 
+  /** Khi chọn xong ảnh: nén + upload, báo lỗi nếu hỏng, rồi xóa lựa chọn để chọn lại được. */
   async function pick(file?: File) {
     if (!file) return;
     setBusy(true);
@@ -45,18 +52,22 @@ export function ImageInput({
 
   return (
     <div className={cn("flex items-center gap-3", className)}>
+      {/* Có ảnh: ô vuông 80px hiện ảnh, bấm để mở ảnh lớn ở tab mới. */}
       {value ? (
         <a href={value} target="_blank" rel="noreferrer" className="block h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-line bg-surface-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={value} alt="" className="h-full w-full object-cover" />
         </a>
       ) : (
+        // Chưa có ảnh: ô vuông viền đứt với icon thêm ảnh (hoặc vòng xoay).
         <div className="grid h-20 w-20 shrink-0 place-items-center rounded-xl border border-dashed border-line-strong bg-surface-2 text-subtle">
           {busy ? <Loader2 size={20} className="animate-spin" /> : <ImagePlus size={20} />}
         </div>
       )}
       <div className="flex flex-col gap-1.5">
+        {/* Ô chọn file ẩn (điện thoại mở camera sau). */}
         <input ref={ref} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => pick(e.target.files?.[0])} />
+        {/* Nút "Thêm ảnh" / "Đổi ảnh" / "Đang tải lên…": bấm để mở ô chọn file. */}
         <button
           type="button"
           disabled={disabled || busy}
@@ -66,6 +77,7 @@ export function ImageInput({
           {busy ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} />}
           {busy ? "Đang tải lên…" : value ? "Đổi ảnh" : label}
         </button>
+        {/* Link đỏ "Gỡ ảnh": chỉ hiện khi đã có ảnh. */}
         {value && !disabled ? (
           <button type="button" onClick={() => onChange("")} className="inline-flex items-center gap-1 text-xs text-danger-600 hover:underline">
             <Trash2 size={12} /> Gỡ ảnh

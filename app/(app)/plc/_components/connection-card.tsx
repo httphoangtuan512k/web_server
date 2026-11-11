@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: thẻ trạng thái kết nối PLC – thiết bị, lần nhận cuối, "● Máy B Online/Offline", nút Làm mới, ô lọc tag.
+ * Dùng ở: đầu trang Giám sát PLC (/plc).
+ */
 
 import { cn } from "@/lib/cn";
 import { fmtDateTime, fmtRelative } from "@/lib/format";
@@ -22,20 +26,25 @@ export function ConnectionCard({
   query: string;
   onQuery: (q: string) => void;
 }) {
+  // Vẽ lại mỗi giây để "x giây trước" luôn đúng.
   useTick(1000);
   const loaded = !!latest || !!error;
   const connected = !!latest?.connected && !error;
+  // Đếm tổng số tag đang nhận của mọi máy.
   const machines = latest?.payload?.machines ?? {};
   const tagCount = Object.values(machines).reduce((n, m) => n + Object.keys(m ?? {}).length, 0);
+  // Chữ trạng thái: đang kiểm tra / lỗi / Online / Offline.
   const status = !loaded ? "● Đang kiểm tra kết nối" : error ? error : connected ? "● Máy B đang Online" : "● Máy B Offline";
 
   return (
     <section className="mb-4 rounded-xl border border-[#dbe3ed] bg-white p-3 shadow-[0_2px_8px_#0f172a0a] sm:p-4">
+      {/* Hàng trên: thông tin thiết bị bên trái, trạng thái + nút Làm mới bên phải */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[15px] text-[#172033]">
             Thiết bị gửi dữ liệu: <b>{latest?.device_id || PLC_DEVICE_ID}</b>
           </div>
+          {/* Lần nhận cuối (kèm "x giây trước") */}
           <div className="num text-[13px] text-[#64748b]">
             {latest?.received_at ? (
               <>
@@ -47,6 +56,7 @@ export function ConnectionCard({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* Trạng thái: xanh nhấp nháy khi Online, đỏ khi Offline */}
           <span className={cn("font-bold", connected ? "text-[#15803d]" : "text-[#dc2626]")}>
             <span className={cn("inline-block", connected && "animate-pulse")}>{status}</span>
           </span>
@@ -60,6 +70,7 @@ export function ConnectionCard({
           </button>
         </div>
       </div>
+      {/* Hàng dưới: mốc giờ C#, số tag, cảnh báo dữ liệu cũ, ô lọc tag */}
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[#eef2f7] pt-3 text-xs text-[#64748b]">
         <span>
           Mốc thời gian từ C#: <b className="num font-semibold text-[#334155]">{latest?.payload?.source_timestamp || "—"}</b>

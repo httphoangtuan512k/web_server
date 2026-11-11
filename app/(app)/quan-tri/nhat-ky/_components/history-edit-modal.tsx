@@ -1,4 +1,6 @@
 "use client";
+// File này: hộp thoại sửa một bản ghi lịch sử đơn hàng.
+// Dùng ở: tab "Lịch sử đơn hàng", nút "Sửa" (chỉ Super Admin).
 
 import { useState } from "react";
 import { api, errorMessage } from "@/lib/api";
@@ -9,6 +11,7 @@ import { OgButton } from "../../_shared/og-button";
 import { fromVnInputValue, toVnInputValue } from "../../_shared/utils";
 import type { HistoryPatch, HistoryRow } from "./types";
 
+// Đổi giá trị bất kỳ thành chuỗi (trống → "").
 const str = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 /** Ô số: rỗng → null, số hợp lệ → number, còn lại giữ chuỗi để server báo lỗi. */
 const numOrRaw = (v: string): number | string | null => {
@@ -21,6 +24,7 @@ const numOrRaw = (v: string): number | string | null => {
 /** Sửa bản ghi lịch sử đơn hàng – PATCH /api/history/:id (chỉ Super Admin). */
 export function HistoryEditModal({ row, onClose, onSaved }: { row: HistoryRow; onClose: () => void; onSaved: () => void }) {
   const toast = useToast();
+  // Dữ liệu form, lấy sẵn từ bản ghi (giờ đổi sang giờ VN).
   const [f, setF] = useState(() => ({
     order_number: str(row.order_number),
     machine_name: str(row.machine_name),
@@ -30,17 +34,21 @@ export function HistoryEditModal({ row, onClose, onSaved }: { row: HistoryRow; o
     new_value: str(row.new_value),
     created_at: toVnInputValue(row.created_at),
   }));
+  // Câu lỗi, trạng thái đang lưu, hàm cập nhật một ô.
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF((s) => ({ ...s, [k]: e.target.value }));
 
+  // Bấm "Lưu thay đổi": kiểm tra, gom dữ liệu, gửi máy chủ.
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const createdAt = fromVnInputValue(f.created_at);
+    // Bắt buộc có số đơn, người thao tác, hành động, thời gian.
     if (!f.order_number.trim() || !f.user_name.trim() || !f.action.trim() || !createdAt) {
       return setError("Số đơn, người thao tác, hành động và thời gian không được để trống.");
     }
     setError("");
+    // Dữ liệu gửi đi (số lượng đổi về số, giờ đổi về giờ quốc tế).
     const body: HistoryPatch = {
       order_number: f.order_number.trim(),
       machine_name: f.machine_name.trim(),
@@ -52,6 +60,7 @@ export function HistoryEditModal({ row, onClose, onSaved }: { row: HistoryRow; o
     };
     setSaving(true);
     try {
+      // Gửi lên máy chủ; thành công thì báo, tải lại bảng, đóng hộp.
       await api.patch(`/api/history/${row.id}`, { ...body });
       toast.success("Đã cập nhật bản ghi lịch sử.");
       onSaved();
@@ -64,6 +73,7 @@ export function HistoryEditModal({ row, onClose, onSaved }: { row: HistoryRow; o
   }
 
   return (
+    // Hộp thoại với nút "Hủy" và "Lưu thay đổi".
     <Modal
       open
       onClose={onClose}
@@ -81,6 +91,7 @@ export function HistoryEditModal({ row, onClose, onSaved }: { row: HistoryRow; o
         </>
       }
     >
+      {/* Các ô sửa: 2 cột trên máy tính, 1 cột trên điện thoại */}
       <form id="history-edit-form" onSubmit={submit} noValidate className="grid gap-4 sm:grid-cols-2">
         <Field label="Số đơn hàng" required>
           <Input value={f.order_number} onChange={set("order_number")} autoFocus />

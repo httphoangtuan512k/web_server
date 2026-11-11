@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: hook (hàm dùng lại của React) tải danh sách đơn hàng và tự làm mới mỗi 30 giây.
+ * Dùng ở: ke-hoach-page.tsx.
+ */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
@@ -12,18 +16,22 @@ const REFRESH_MS = 30_000;
  * `loadedAt` = thời điểm tải xong gần nhất (ms) – dùng làm "bây giờ" cho bộ lọc lưu trữ 3 tháng.
  */
 export function useOrders() {
+  // Dữ liệu đơn, lỗi, thời điểm tải xong, đang tải lại.
   const [data, setData] = useState<OrdersResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadedAt, setLoadedAt] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
+  // Cờ "đang gọi API" để không gọi chồng nhiều lần.
   const inflight = useRef(false);
 
+  // Tải danh sách đơn từ máy chủ.
   const reload = useCallback(async () => {
     if (inflight.current) return;
     inflight.current = true;
     setRefreshing(true);
     try {
       const d = await api.get<OrdersResponse>("/api/orders");
+      // Lưu dữ liệu (đảm bảo orders/permissions luôn là mảng).
       setData({ ...d, orders: Array.isArray(d?.orders) ? d.orders : [], permissions: Array.isArray(d?.permissions) ? d.permissions : [] });
       setError(null);
       setLoadedAt(Date.now());
@@ -35,6 +43,7 @@ export function useOrders() {
     }
   }, []);
 
+  // Tải ngay lần đầu, rồi 30 giây/lần khi tab đang mở; quay lại tab thì tải ngay.
   useEffect(() => {
     const first = setTimeout(reload, 0);
     const timer = setInterval(() => {
@@ -44,6 +53,7 @@ export function useOrders() {
       if (document.visibilityState === "visible") reload();
     };
     document.addEventListener("visibilitychange", onVisible);
+    // Rời trang: hủy hẹn giờ và bỏ theo dõi.
     return () => {
       clearTimeout(first);
       clearInterval(timer);

@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: hộp thoại Super Admin sửa toàn bộ dữ liệu một đơn hàng.
+ * Dùng ở: nút "✎ Sửa toàn bộ" trên trang Xưởng vận hành (chỉ tài khoản super).
+ */
 
 import { useState } from "react";
 import { api, errorMessage } from "@/lib/api";
@@ -10,6 +14,7 @@ import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import type { Order } from "./types";
 
+// Loại ô nhập: chữ, số, ngày, trạng thái, tick, ảnh.
 type FieldKind = "text" | "number" | "date" | "status" | "bool" | "image";
 
 /** Danh sách trường y hệt editFields của trang cũ (thứ tự + nhãn). */
@@ -40,12 +45,15 @@ const FIELDS: ReadonlyArray<{ key: keyof Order; label: string; kind: FieldKind }
   { key: "imageData", label: "Hình ảnh đơn", kind: "image" },
 ];
 
+// Bản nháp: giá trị các ô đang sửa (chữ hoặc đúng/sai).
 type Draft = Record<string, string | boolean>;
 
+/** Đổi đơn hàng thành bản nháp để điền sẵn vào form. */
 function toDraft(o: Order): Draft {
   const d: Draft = {};
   for (const f of FIELDS) {
     const v = o[f.key];
+    // Tick → đúng/sai; ngày → "YYYY-MM-DD"; còn lại → chữ.
     if (f.kind === "bool") d[f.key] = Boolean(v);
     else if (f.kind === "date") d[f.key] = v ? todayKey(new Date(String(v))) : "";
     else d[f.key] = v === null || v === undefined ? "" : String(v);
@@ -62,12 +70,16 @@ export function EditOrderModal({ order, onClose, onSaved }: { order: Order | nul
   );
 }
 
+/** Form sửa: mỗi trường một ô, nút Hủy / Lưu thay đổi. */
 function EditForm({ order, onClose, onSaved }: { order: Order; onClose: () => void; onSaved: () => void }) {
   const toast = useToast();
+  // Bản nháp (điền sẵn từ đơn) và trạng thái đang lưu.
   const [draft, setDraft] = useState<Draft>(() => toDraft(order));
   const [busy, setBusy] = useState(false);
+  // Đổi giá trị một ô.
   const set = (k: string, v: string | boolean) => setDraft((d) => ({ ...d, [k]: v }));
 
+  // Lưu: đổi bản nháp về đúng kiểu rồi gửi PATCH lên server.
   async function save() {
     const body: Record<string, string | number | boolean> = {};
     for (const f of FIELDS) {
@@ -76,6 +88,7 @@ function EditForm({ order, onClose, onSaved }: { order: Order; onClose: () => vo
       else if (f.kind === "bool") body[f.key] = Boolean(v);
       else body[f.key] = String(v ?? "");
     }
+    // Gửi; thành công → báo, tải lại, đóng hộp.
     setBusy(true);
     try {
       await api.patch(`/api/orders/${order.id}`, body);
@@ -91,16 +104,19 @@ function EditForm({ order, onClose, onSaved }: { order: Order; onClose: () => vo
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Lưới ô nhập: 1 cột trên điện thoại, 2 cột trên máy tính */}
       <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
         {FIELDS.map((f) => {
           const id = `edit-${f.key}`;
           const v = draft[f.key];
+          // Ô ảnh (chiếm cả hàng).
           if (f.kind === "image")
             return (
               <Field key={f.key} label={f.label} className="sm:col-span-2">
                 <ImageInput value={String(v ?? "")} onChange={(url) => set(f.key, url)} folder="orders" />
               </Field>
             );
+          // Ô tick "Đơn đang tạm dừng".
           if (f.kind === "bool")
             return (
               <Field key={f.key} label={f.label}>
@@ -109,6 +125,7 @@ function EditForm({ order, onClose, onSaved }: { order: Order; onClose: () => vo
                 </div>
               </Field>
             );
+          // Ô chọn trạng thái (giữ cả giá trị lạ nếu có).
           if (f.kind === "status")
             return (
               <Field key={f.key} label={f.label} htmlFor={id}>
@@ -120,6 +137,7 @@ function EditForm({ order, onClose, onSaved }: { order: Order; onClose: () => vo
                 </Select>
               </Field>
             );
+          // Ô chữ / số / ngày.
           return (
             <Field key={f.key} label={f.label} htmlFor={id}>
               <Input
@@ -133,6 +151,7 @@ function EditForm({ order, onClose, onSaved }: { order: Order; onClose: () => vo
           );
         })}
       </div>
+      {/* Chân hộp: Hủy và Lưu thay đổi */}
       <div className="-mx-5 -mb-4 flex justify-end gap-2 border-t border-line bg-surface-2 px-5 py-3">
         <Button variant="secondary" onClick={onClose} disabled={busy}>
           Hủy

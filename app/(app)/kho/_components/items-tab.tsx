@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: tab Hàng hóa / Bao bì / Vật tư – tìm kiếm, nhập/xuất, thêm/sửa/xóa mặt hàng.
+ * Dùng ở: trang /kho. Máy tính hiện dạng bảng, điện thoại hiện dạng thẻ.
+ */
 
 import { useMemo, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
@@ -11,6 +15,7 @@ import { KBtn, KCard, KEmptyRow, KNotice, KPill, KTable, kInput, kTd, kTh, kTr }
 import { StockTxForm } from "./stock-tx-form";
 import type { ItemCategory, WarehouseItem } from "./types";
 
+// Mô tả một cột của bảng: tên, cách hiện giá trị, căn phải?
 interface Col {
   key: string;
   label: string;
@@ -20,10 +25,12 @@ interface Col {
   primary?: boolean;
 }
 
+// Ô vị trí kệ (nhãn xanh), ô số tồn (in đậm), và "—" khi trống.
 const Shelf = ({ v }: { v?: string }) => (v ? <KPill>{v}</KPill> : <span className="text-[#66758a]">—</span>);
 const Qty = ({ x }: { x: WarehouseItem }) => <b className="tabular-nums">{fmtNumber(x.quantity, 2, "0")}</b>;
 const dash = (v?: string) => v || "—";
 
+// Cấu hình riêng cho từng loại kho: tiêu đề, chữ hướng dẫn, các cột.
 const CONFIG: Record<
   ItemCategory,
   { title: string; description: string; notice: string; search: string; empty: string; add: string; filter: (x: WarehouseItem) => string; cols: Col[] }
@@ -76,6 +83,7 @@ const CONFIG: Record<
   },
 };
 
+// Tab danh mục một loại kho. onChanged = tải lại dữ liệu sau khi thay đổi.
 export function ItemsTab({
   category,
   items,
@@ -90,14 +98,17 @@ export function ItemsTab({
   const toast = useToast();
   const confirm = useConfirm();
   const cfg = CONFIG[category];
+  // Chữ tìm kiếm; mặt hàng đang sửa (null = thêm mới, undefined = đóng form).
   const [q, setQ] = useState("");
   const [editing, setEditing] = useState<WarehouseItem | null | undefined>(undefined);
 
+  // Lọc danh sách theo chữ tìm kiếm (không phân biệt hoa thường).
   const filtered = useMemo(() => {
     const k = q.trim().toLowerCase();
     return k ? items.filter((x) => cfg.filter(x).toLowerCase().includes(k)) : items;
   }, [items, q, cfg]);
 
+  // Nút "Xóa": hỏi xác nhận → gọi API xóa → tải lại.
   async function remove(x: WarehouseItem) {
     const ok = await confirm({
       title: `Xóa “${x.name}”?`,
@@ -115,6 +126,7 @@ export function ItemsTab({
     }
   }
 
+  // Nút Sửa / Xóa của mỗi dòng (không có quyền thì hiện chữ xám).
   const actions = (x: WarehouseItem) =>
     canEdit ? (
       <div className="flex flex-wrap items-center gap-1.5">
@@ -129,6 +141,7 @@ export function ItemsTab({
       <span className="text-xs text-[#66758a]">Theo quyền được cấp</span>
     );
 
+  // Chuẩn bị dữ liệu: câu khi trống, cột chính và các cột phụ cho dạng thẻ.
   const empty = { goods: [], packaging: [], materials: [] } as Record<ItemCategory, WarehouseItem[]>;
   const emptyText = items.length ? "Không tìm thấy mục phù hợp." : cfg.empty;
   const primary = cfg.cols.find((c) => c.primary)!;
@@ -138,6 +151,7 @@ export function ItemsTab({
     <KCard
       title={cfg.title}
       description={cfg.description}
+      // Ô tìm kiếm ở góc phải thẻ.
       actions={
         <input
           type="search"
@@ -149,8 +163,10 @@ export function ItemsTab({
         />
       }
     >
+      {/* Dòng hướng dẫn. */}
       <KNotice>{cfg.notice}</KNotice>
 
+      {/* Có quyền sửa: form nhập/xuất + nút "+ Thêm …". */}
       {canEdit ? (
         <>
           <div className="mt-3.5 mb-[17px]">
@@ -166,6 +182,7 @@ export function ItemsTab({
 
       {/* Máy tính / máy tính bảng */}
       <div className="hidden sm:block">
+        {/* Bảng: tiêu đề cột + cột "Thao tác". */}
         <KTable minWidth={640}>
           <thead>
             <tr>
@@ -177,6 +194,7 @@ export function ItemsTab({
               <th className={cn(kTh, "text-left")}>Thao tác</th>
             </tr>
           </thead>
+          {/* Mỗi mặt hàng một dòng. */}
           <tbody>
             {!filtered.length ? (
               <KEmptyRow colSpan={cfg.cols.length + 1}>{emptyText}</KEmptyRow>
@@ -202,6 +220,7 @@ export function ItemsTab({
           <p className="rounded-xl border border-[#dce5ef] px-4 py-7 text-center text-[13px] text-[#66758a]">{emptyText}</p>
         ) : (
           <ul className="space-y-2.5">
+            {/* Mỗi mặt hàng một thẻ: tên + thông tin phụ bên trái, số tồn bên phải. */}
             {filtered.map((x) => (
               <li key={x.id} className="rounded-xl border border-[#dce5ef] p-3">
                 <div className="flex items-start justify-between gap-3">
@@ -219,6 +238,7 @@ export function ItemsTab({
                     <Qty x={x} /> <span className="text-xs text-[#66758a]">{x.unit}</span>
                   </p>
                 </div>
+                {/* Nút Sửa / Xóa. */}
                 <div className="mt-2">{actions(x)}</div>
               </li>
             ))}
@@ -226,6 +246,7 @@ export function ItemsTab({
         )}
       </div>
 
+      {/* Hộp thoại thêm/sửa mặt hàng (khi đang mở). */}
       {editing !== undefined ? <ItemFormModal category={category} item={editing} onClose={() => setEditing(undefined)} onSaved={onChanged} /> : null}
     </KCard>
   );

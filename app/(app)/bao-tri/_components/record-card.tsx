@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: danh sách lịch sử bảo trì – bảng trên máy tính, thẻ trên điện thoại; ảnh nhỏ bấm để phóng to.
+ * Dùng ở: trang Bảo trì; nút Sửa/Xóa chỉ hiện cho Super Admin.
+ */
 
 /* eslint-disable @next/next/no-img-element */
 import { cn } from "@/lib/cn";
@@ -18,6 +22,7 @@ export const btn = {
 
 /** "08:53 02/11/2026" → giờ và ngày trên 2 dòng như bảng cũ. */
 function DateCell({ v }: { v: string }) {
+  // Tách giờ và ngày tại dấu cách đầu tiên.
   const s = fmtDateTime(v);
   const i = s.indexOf(" ");
   return i > 0 ? (
@@ -30,6 +35,7 @@ function DateCell({ v }: { v: string }) {
   );
 }
 
+/** Ảnh nhỏ bấm để xem lớn; không có ảnh → "-". */
 function Thumb({ src, alt, onOpen, className }: { src: string; alt: string; onOpen: (src: string, alt: string) => void; className?: string }) {
   if (!src) return <span className="text-[#64748b]">-</span>;
   return (
@@ -45,6 +51,7 @@ function Thumb({ src, alt, onOpen, className }: { src: string; alt: string; onOp
   );
 }
 
+/** Props của RecordList: danh sách, quyền sửa/xóa, các hàm xử lý khi bấm. */
 type Props = {
   records: MaintenanceRecord[];
   canManage: boolean;
@@ -55,6 +62,7 @@ type Props = {
   empty?: React.ReactNode;
 };
 
+// Tiêu đề cột và kiểu ô tiêu đề / ô dữ liệu / ô mô tả dài.
 const HEAD = ["Ngày giờ", "Thiết bị", "Hư hỏng", "Ảnh hư hỏng", "Nội dung sửa chữa", "Trạng thái sau sửa", "Ảnh sau sửa", "Người nhập"];
 const th = "sticky top-0 z-[1] bg-[#475569] px-2.5 py-3 text-center text-[15px] font-bold whitespace-nowrap text-white";
 const td = "border-t border-[#d5deea] px-2.5 py-[11px] text-center align-middle text-[15px] text-[#17243a]";
@@ -62,6 +70,7 @@ const desc = "min-w-[180px] text-left whitespace-pre-wrap [overflow-wrap:anywher
 
 /** Bảng lịch sử bảo trì (máy tính) + dạng thẻ (điện thoại) – cột & nút như bản gốc. */
 export function RecordList({ records, canManage, onOpenImage, onEdit, onDelete, empty }: Props) {
+  // Nút Sửa + Xóa cho 1 bản ghi (chỉ khi có quyền); row = xếp dọc trong bảng.
   const actions = (r: MaintenanceRecord, row?: boolean) =>
     canManage ? (
       <div className={cn("flex gap-1.5", row ? "flex-col items-center" : "flex-wrap")}>
@@ -81,6 +90,7 @@ export function RecordList({ records, canManage, onOpenImage, onEdit, onDelete, 
         <table className="w-full min-w-[1100px] border-separate border-spacing-0 bg-white">
           <thead>
             <tr>
+              {/* Hàng tiêu đề xám, dính trên cùng khi cuộn */}
               {HEAD.map((h) => (
                 <th key={h} className={th}>
                   {h}
@@ -90,6 +100,7 @@ export function RecordList({ records, canManage, onOpenImage, onEdit, onDelete, 
             </tr>
           </thead>
           <tbody>
+            {/* Trống/lỗi → 1 dòng thông báo; có dữ liệu → mỗi bản ghi 1 dòng */}
             {empty ? (
               <tr>
                 <td colSpan={canManage ? 9 : 8} className="p-[30px] text-center text-[#64748b]">
@@ -99,6 +110,7 @@ export function RecordList({ records, canManage, onOpenImage, onEdit, onDelete, 
             ) : (
               records.map((r) => (
                 <tr key={r.id} className="transition-colors hover:bg-[#f8fafc]">
+                  {/* Ngày giờ, thiết bị, hư hỏng, ảnh hư hỏng */}
                   <td className={cn(td, "whitespace-nowrap")}>
                     <DateCell v={r.created_at} />
                   </td>
@@ -107,6 +119,7 @@ export function RecordList({ records, canManage, onOpenImage, onEdit, onDelete, 
                   <td className={td}>
                     <Thumb src={faultImageOf(r)} alt={`Ảnh hư hỏng – ${r.equipment}`} onOpen={onOpenImage} />
                   </td>
+                  {/* Sửa chữa, trạng thái sau, ảnh sau, người nhập, thao tác */}
                   <td className={cn(td, desc)}>{r.repair_content || "-"}</td>
                   <td className={cn(td, desc, "min-w-[150px]")}>{r.after_status || "-"}</td>
                   <td className={td}>
@@ -129,6 +142,7 @@ export function RecordList({ records, canManage, onOpenImage, onEdit, onDelete, 
           <ul className="space-y-3">
             {records.map((r) => (
               <li key={r.id} className="overflow-hidden rounded-[10px] border border-[#d5deea] bg-white">
+                {/* Đầu thẻ: tên thiết bị + ngày giờ */}
                 <div className="flex items-start justify-between gap-3 bg-[#475569] px-3 py-2 text-white">
                   <b className="min-w-0 text-[15px] [overflow-wrap:anywhere]">{r.equipment}</b>
                   <span className="shrink-0 text-right text-xs leading-snug text-white/85">
@@ -136,6 +150,7 @@ export function RecordList({ records, canManage, onOpenImage, onEdit, onDelete, 
                   </span>
                 </div>
                 <div className="space-y-3 p-3 text-sm">
+                  {/* Ảnh hư hỏng + mô tả hư hỏng */}
                   <div className="flex gap-3">
                     <Thumb src={faultImageOf(r)} alt={`Ảnh hư hỏng – ${r.equipment}`} onOpen={onOpenImage} className="h-[72px] w-[84px] shrink-0" />
                     <div className="min-w-0">
@@ -143,6 +158,7 @@ export function RecordList({ records, canManage, onOpenImage, onEdit, onDelete, 
                       <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{r.fault_description}</p>
                     </div>
                   </div>
+                  {/* Ảnh sau sửa + nội dung sửa chữa + trạng thái sau sửa */}
                   <div className="flex gap-3">
                     <Thumb src={afterImageOf(r)} alt={`Ảnh sau sửa – ${r.equipment}`} onOpen={onOpenImage} className="h-[72px] w-[84px] shrink-0" />
                     <div className="min-w-0">
@@ -152,6 +168,7 @@ export function RecordList({ records, canManage, onOpenImage, onEdit, onDelete, 
                       <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{r.after_status || "-"}</p>
                     </div>
                   </div>
+                  {/* Chân thẻ: người nhập + nút Sửa/Xóa */}
                   <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[#e2e8f0] pt-2.5">
                     <span className="text-[13px] text-[#64748b]">
                       Người nhập: <b className="text-[#17243a]">{r.created_by || "-"}</b>

@@ -1,3 +1,6 @@
+// File này: khai báo hình dạng dữ liệu (kiểu) của tài khoản, phiên đăng nhập, quyền.
+// Dùng ở: các component trang Người dùng.
+
 /** Tài khoản – dạng trả về của GET /api/users (không gồm Super Admin). */
 export interface UserAccount {
   id: number;
@@ -45,11 +48,14 @@ export interface LoginSession {
   status: string;
 }
 
+/** Một lựa chọn quyền: mã, nhãn đầy đủ, nhãn ngắn. */
 export interface PermOption {
   value: string;
   label: string;
   short: string;
 }
 
+/** Lấy quyền đơn hàng của tài khoản (đọc khóa cũ trước, rồi khóa mới). */
 export const orderPermsOf = (u: UserAccount) => u.permissions ?? u.orderPermissions ?? [];
+/** Là quản trị: Super Admin hoặc vai trò "admin". */
 export const isAdminRole = (u: Pick<UserAccount, "role" | "isSuper">) => u.isSuper || u.role === "admin";

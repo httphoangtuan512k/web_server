@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: hộp thoại "Phân quyền tài liệu" – tích chọn nhân viên và chọn "Chỉ xem" hoặc "Xem và cập nhật".
+ * Dùng ở: nút "Phân quyền" trên trang /tai-lieu (chủ sở hữu và Super Admin).
+ */
 
 import { Loader2, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -11,22 +15,28 @@ import { useToast } from "@/components/ui/toast";
 import { tlBtn } from "./tl-ui";
 import type { DocPermission, DocUser, DocumentFile } from "./types";
 
+// Hai mức quyền được cấp.
 type Perm = "view" | "edit";
 
+// Hộp thoại phân quyền một tài liệu. onSaved = tải lại danh sách sau khi lưu.
 export function PermissionModal({ doc, onClose, onSaved }: { doc: DocumentFile; onClose: () => void; onSaved: () => Promise<void> | void }) {
   const toast = useToast();
+  // Danh sách nhân viên (null = đang tải) và quyền đã cấp theo mã người dùng.
   const [users, setUsers] = useState<DocUser[] | null>(null);
   const [grants, setGrants] = useState<Record<number, Perm>>({});
+  // Lỗi, chữ tìm kiếm, đang lưu.
   const [error, setError] = useState("");
   const [q, setQ] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Mở hộp thoại: tải cùng lúc danh sách nhân viên và quyền hiện có.
   useEffect(() => {
     let alive = true;
     Promise.all([api.get<{ users: DocUser[] }>("/api/tai-lieu/users"), api.get<{ permissions: DocPermission[] }>(`/api/tai-lieu/${doc.id}/permissions`)])
       .then(([u, p]) => {
         if (!alive) return;
         setUsers(u.users || []);
+        // Đổi danh sách quyền thành bảng tra: mã người dùng → "view" / "edit".
         setGrants(Object.fromEntries((p.permissions || []).map((x) => [Number(x.user_id), x.permission === "edit" ? "edit" : "view"])));
       })
       .catch((e) => alive && setError(errorMessage(e)));
@@ -35,6 +45,7 @@ export function PermissionModal({ doc, onClose, onSaved }: { doc: DocumentFile; 
     };
   }, [doc.id]);
 
+  // Lọc nhân viên theo chữ tìm (bỏ chủ sở hữu ra).
   const list = useMemo(() => {
     const k = q.trim().toLowerCase();
     return (users || [])
@@ -42,8 +53,10 @@ export function PermissionModal({ doc, onClose, onSaved }: { doc: DocumentFile; 
       .filter((u) => !k || `${u.fullName} ${u.username} ${u.position}`.toLowerCase().includes(k));
   }, [users, q, doc.owner_user_id]);
 
+  // Số người đã được cấp quyền.
   const count = Object.keys(grants).length;
 
+  // Tích → cấp "Chỉ xem" (mặc định); bỏ tích → bỏ quyền.
   const toggle = (id: number, on: boolean) =>
     setGrants((g) => {
       const n = { ...g };
@@ -52,6 +65,7 @@ export function PermissionModal({ doc, onClose, onSaved }: { doc: DocumentFile; 
       return n;
     });
 
+  // Nút "Lưu phân quyền": gửi toàn bộ danh sách quyền lên máy chủ.
   async function save() {
     setSaving(true);
     try {
@@ -76,6 +90,7 @@ export function PermissionModal({ doc, onClose, onSaved }: { doc: DocumentFile; 
       description={doc.original_name}
       footer={
         <>
+          {/* Chân hộp thoại: số người đã cấp, nút "Đóng", nút "Lưu phân quyền". */}
           <span className="mr-auto self-center text-[13px] text-muted">Đã cấp quyền cho {count} người</span>
           <button type="button" className={cn(tlBtn.base, tlBtn.md, tlBtn.gray)} onClick={onClose}>
             Đóng
@@ -87,10 +102,12 @@ export function PermissionModal({ doc, onClose, onSaved }: { doc: DocumentFile; 
         </>
       }
     >
+      {/* Hướng dẫn ngắn. */}
       <p className="mb-3 text-[13px] text-muted">
         Bỏ tích = không có quyền (không nhìn thấy tài liệu). Tích chọn rồi chọn quyền <b className="text-fg">Chỉ xem</b> hoặc{" "}
         <b className="text-fg">Xem và cập nhật</b>.
       </p>
+      {/* Chưa có danh sách: lỗi hoặc vòng xoay. Có rồi: ô tìm + danh sách nhân viên. */}
       {!users ? (
         error ? (
           <p className="py-6 text-center text-sm text-danger-600">{error}</p>
@@ -104,6 +121,7 @@ export function PermissionModal({ doc, onClose, onSaved }: { doc: DocumentFile; 
             <EmptyState icon={Users} title={users.length ? "Không tìm thấy nhân viên phù hợp." : "Không có tài khoản nhân viên hoạt động."} />
           ) : (
             <ul className="grid gap-2 sm:grid-cols-2">
+              {/* Mỗi nhân viên: ô tích, tên, tài khoản · chức vụ, ô chọn mức quyền. */}
               {list.map((u) => {
                 const granted = u.id in grants;
                 return (
@@ -121,6 +139,7 @@ export function PermissionModal({ doc, onClose, onSaved }: { doc: DocumentFile; 
                         </span>
                       </span>
                     </label>
+                    {/* Ô chọn mức quyền (chỉ bật khi đã tích). */}
                     <Select
                       aria-label={`Quyền của ${u.fullName}`}
                       value={grants[u.id] || "view"}

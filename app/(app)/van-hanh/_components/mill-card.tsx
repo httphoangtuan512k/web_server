@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: thẻ 1 máy nghiền – tiêu đề, trạng thái chạy, đơn đang chạy, sơ đồ SCADA, dòng thông báo PLC.
+ * Dùng ở: trang Xưởng vận hành (mỗi máy một thẻ).
+ */
 
 import { cn } from "@/lib/cn";
 import { fmtNumber } from "@/lib/format";
@@ -36,21 +40,25 @@ export function MillCard({
   canEdit: boolean;
   onSave: (key: PlcStateKey, raw: string) => Promise<boolean>;
 }) {
+  // Chọn viên trạng thái và tiêu đề cho máy.
   const badge = RUN_BADGE[view.run];
   const heading = HEADINGS[cfg.machine] ?? `Xưởng vận hành – ${cfg.title} ${cfg.model}`;
 
   return (
+    // Khung thẻ; viền xanh mờ khi máy đang nghiền.
     <section
       className={cn(
         "min-w-0 rounded-xl border border-[#dbe3ed] bg-white p-1.5 shadow-[0_2px_8px_rgba(15,23,42,0.05)] transition-shadow sm:p-2.5",
         view.run === "running" && "ring-1 ring-[#16a34a]/25",
       )}
     >
+      {/* Hàng tiêu đề + viên trạng thái */}
       <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-2.5 gap-y-1 px-1 pt-0.5 sm:mb-2.5">
         <h2 className="min-w-0 flex-[1_1_180px] text-[15px] leading-tight font-bold text-[#1e3a8a] sm:text-lg">{heading}</h2>
         <span className={cn("shrink-0 rounded-full px-2 py-1 text-[11px] font-bold whitespace-nowrap sm:px-[11px] sm:py-1.5 sm:text-sm", badge.cls)}>{badge.text}</span>
       </div>
 
+      {/* Danh sách đơn đang chạy trên máy này: số đơn · còn bao nhiêu tấn */}
       {orders.length ? (
         <p className="mb-1.5 flex flex-wrap gap-1.5 px-1 text-xs text-[#475569]">
           <span className="text-[#64748b]">Đơn đang chạy:</span>
@@ -62,8 +70,10 @@ export function MillCard({
         </p>
       ) : null}
 
+      {/* Sơ đồ SCADA có số liệu đè lên ảnh */}
       <ScadaDiagram machine={cfg.machine} view={view} canEdit={canEdit} onSave={onSave} />
 
+      {/* Dòng thông báo PLC (đỏ khi lỗi) */}
       <p
         className={cn(
           "num mt-1 px-1 text-[10px] leading-snug break-words sm:mt-2 sm:text-xs",

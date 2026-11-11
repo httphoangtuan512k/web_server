@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: hộp thoại "Lịch sử hoạt động" của một tài liệu – ai làm gì, lúc nào.
+ * Dùng ở: nút "Lịch sử" trên trang /tai-lieu (chủ sở hữu và Super Admin).
+ */
 
 import { History } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -11,10 +15,13 @@ import { Table, THead, Td, Th, Tr } from "@/components/ui/table";
 import { tlBtn } from "./tl-ui";
 import type { DocHistoryItem, DocumentFile } from "./types";
 
+// Hộp thoại lịch sử một tài liệu.
 export function HistoryModal({ doc, onClose }: { doc: DocumentFile; onClose: () => void }) {
+  // Danh sách lịch sử (null = đang tải) và lỗi.
   const [items, setItems] = useState<DocHistoryItem[] | null>(null);
   const [error, setError] = useState("");
 
+  // Mở hộp thoại: tải lịch sử của tài liệu.
   useEffect(() => {
     let alive = true;
     api
@@ -39,6 +46,7 @@ export function HistoryModal({ doc, onClose }: { doc: DocumentFile; onClose: () 
         </button>
       }
     >
+      {/* Đang tải/lỗi → thông báo; trống → "Chưa có lịch sử"; có → bảng 3 cột. */}
       {!items ? (
         error ? (
           <p className="py-6 text-center text-sm text-danger-600">{error}</p>
@@ -58,6 +66,7 @@ export function HistoryModal({ doc, onClose }: { doc: DocumentFile; onClose: () 
               </tr>
             </THead>
             <tbody>
+              {/* Mỗi hoạt động một dòng. */}
               {items.map((x, i) => (
                 <Tr key={i}>
                   <Td className="font-medium">{x.user_name}</Td>

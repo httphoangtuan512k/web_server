@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: danh sách tài liệu – tên, người tải lên, quyền của bạn, trạng thái và các nút thao tác.
+ * Dùng ở: trang /tai-lieu. Máy tính hiện bảng, điện thoại hiện thẻ.
+ */
 
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/cn";
@@ -6,6 +10,7 @@ import { fmtDateTime } from "@/lib/format";
 import { tlBtn } from "./tl-ui";
 import { PERMISSION_LABEL, type DocumentFile } from "./types";
 
+// Các việc làm được trên một tài liệu (trang cha truyền vào).
 export interface DocActions {
   download: (d: DocumentFile) => void;
   update: (d: DocumentFile) => void;
@@ -15,6 +20,7 @@ export interface DocActions {
   unlock: (d: DocumentFile) => void;
 }
 
+// Quyền với một tài liệu: cập nhật? quản lý (phân quyền, lịch sử, xóa)? Super Admin?
 export interface DocAccess {
   canUpdate: boolean;
   canManage: boolean;
@@ -24,6 +30,7 @@ export interface DocAccess {
 /** Dung lượng kiểu bản gốc: "0.25 MB". */
 const sizeMB = (d: DocumentFile) => `${(Number(d.size_bytes) / 1024 / 1024).toFixed(2)} MB`;
 
+// Chữ "Quyền của bạn" cho một tài liệu.
 function permText(doc: DocumentFile, isSuper: boolean) {
   const p = doc.my_permission;
   if (p === "owner") return PERMISSION_LABEL.owner;
@@ -32,23 +39,28 @@ function permText(doc: DocumentFile, isSuper: boolean) {
   return PERMISSION_LABEL.view;
 }
 
+// Nhãn xanh nhỏ, vd "Sẵn sàng".
 const Tag = ({ children }: { children: React.ReactNode }) => (
   <span className="inline-block rounded-full bg-[#eff6ff] px-2 py-1 text-[11px] whitespace-nowrap text-[#1d4ed8]">{children}</span>
 );
 
 /** Các nút thao tác – đúng chữ, màu, thứ tự của bản gốc (Gỡ khóa là nút mới, chỉ Super Admin). */
 function RowActions({ doc, access, actions, busy }: { doc: DocumentFile; access: DocAccess; actions: DocActions; busy: boolean }) {
+  // Kiểu nút nhỏ dùng chung.
   const b = cn(tlBtn.base, tlBtn.sm);
   return (
     <div className="flex flex-wrap gap-1.5">
+      {/* "Xem / Tải" (xanh) – ai cũng có. */}
       <button type="button" className={cn(b, tlBtn.blue)} disabled={busy} onClick={() => actions.download(doc)}>
         {busy ? <Loader2 size={12} className="animate-spin" /> : null}Xem / Tải
       </button>
+      {/* "Cập nhật" (xanh lá) – người có quyền sửa. */}
       {access.canUpdate ? (
         <button type="button" className={cn(b, tlBtn.green)} onClick={() => actions.update(doc)}>
           Cập nhật
         </button>
       ) : null}
+      {/* "Phân quyền", "Lịch sử" (xám) – chủ sở hữu / Super Admin. */}
       {access.canManage ? (
         <>
           <button type="button" className={cn(b, tlBtn.gray)} onClick={() => actions.permissions(doc)}>
@@ -59,11 +71,13 @@ function RowActions({ doc, access, actions, busy }: { doc: DocumentFile; access:
           </button>
         </>
       ) : null}
+      {/* "Gỡ khóa" – chỉ Super Admin. */}
       {access.isSuper ? (
         <button type="button" className={cn(b, tlBtn.slate)} title="Gỡ khóa chỉnh sửa" onClick={() => actions.unlock(doc)}>
           Gỡ khóa
         </button>
       ) : null}
+      {/* "Xóa" (đỏ) – chủ sở hữu / Super Admin. */}
       {access.canManage ? (
         <button type="button" className={cn(b, tlBtn.red)} onClick={() => actions.remove(doc)}>
           Xóa
@@ -73,9 +87,11 @@ function RowActions({ doc, access, actions, busy }: { doc: DocumentFile; access:
   );
 }
 
+// Kiểu ô tiêu đề cột và ô dữ liệu.
 const th = "sticky top-0 z-[1] border-b border-[#e2e8f0] bg-[#f8fafc] px-2.5 py-3 text-left text-[13px] font-bold whitespace-nowrap text-[#475569]";
 const td = "border-b border-[#e2e8f0] px-2.5 py-3 text-left align-middle text-[13px]";
 
+// Danh sách tài liệu. empty = câu hiện thay cho danh sách (đang tải / lỗi / trống).
 export function DocumentList({
   docs,
   accessOf,
@@ -107,6 +123,7 @@ export function DocumentList({
             </tr>
           </thead>
           <tbody>
+            {/* Có câu thông báo → một dòng; không thì mỗi tài liệu một dòng. */}
             {empty ? (
               <tr>
                 <td colSpan={5} className={cn(td, "p-[30px] text-center text-[#64748b]")}>
@@ -116,6 +133,7 @@ export function DocumentList({
             ) : (
               docs.map((d) => (
                 <tr key={d.id} className="transition-colors hover:bg-[#f8fafc]">
+                  {/* Tên tài liệu + dung lượng · thời gian cập nhật. */}
                   <td className={cn(td, "max-w-[420px]")}>
                     <strong className="block [overflow-wrap:anywhere]">{d.original_name}</strong>
                     <span className="text-[13px] leading-relaxed text-[#64748b]" title={`Cập nhật ${fmtDateTime(d.updated_at)}`}>
@@ -143,6 +161,7 @@ export function DocumentList({
           <p className="rounded-[10px] border border-[#e2e8f0] p-[30px] text-center text-[13px] text-[#64748b]">{empty}</p>
         ) : (
           <ul className="space-y-2.5">
+            {/* Mỗi tài liệu một thẻ: tên, thông tin, quyền, nút thao tác. */}
             {docs.map((d) => (
               <li key={d.id} className="rounded-[10px] border border-[#e2e8f0] p-3 text-[13px]">
                 <div className="flex items-start justify-between gap-2">

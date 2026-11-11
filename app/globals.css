@@ -1,3 +1,5 @@
+/* File này: CSS chung cho cả app – bảng màu, phông chữ, bóng đổ, kiểu in. Nạp trong app/layout.tsx. */
+/* Nạp Tailwind CSS (thư viện viết kiểu dáng bằng tên lớp ngắn như p-4, text-sm). */
 @import "tailwindcss";
 
 /*
@@ -6,6 +8,7 @@
  * Dùng qua tiện ích Tailwind: bg-surface, text-fg, text-muted, border-line, bg-brand-600, text-accent-600, ...
  */
 :root {
+  /* Màu nền, nền thẻ (trắng, xám rất nhạt), chữ chính/phụ/mờ, đường viền, viền khi chọn. */
   --bg: #f3f5f8;
   --surface: #ffffff;
   --surface-2: #f8fafc;
@@ -17,6 +20,7 @@
   --line-strong: #cfd7e2;
   --ring: #2f6fd6;
 
+  /* Xanh thương hiệu (brand): từ rất nhạt (50) đến rất đậm (900). */
   --brand-50: #eef4ff;
   --brand-100: #dbe7ff;
   --brand-200: #b9cff8;
@@ -26,12 +30,14 @@
   --brand-800: #163a76;
   --brand-900: #0f2a57;
 
+  /* Cam nhấn (accent). */
   --accent-50: #fdf3ec;
   --accent-100: #fbe3d2;
   --accent-500: #e0874e;
   --accent-600: #c96f36;
   --accent-700: #a5572a;
 
+  /* Màu trạng thái: thành công (xanh lá), cảnh báo (vàng), lỗi (đỏ), thông tin (xanh dương). */
   --success-50: #ecfdf3;
   --success-600: #16a34a;
   --success-700: #15803d;
@@ -44,17 +50,21 @@
   --info-50: #eff6ff;
   --info-600: #2563eb;
 
+  /* Màu navy cũ (tên "sidebar" giữ lại từ bản trước). */
   --sidebar-bg: #172b3a; /* navy thanh tiêu đề giao diện cũ */
   --sidebar-fg: #c9d6ee;
   --sidebar-active: #1f57b8;
 
+  /* Bóng đổ: nhẹ cho thẻ, đậm hơn cho hộp thoại/thông báo. */
   --shadow-card: 0 1px 2px rgb(15 27 45 / 0.04), 0 1px 3px rgb(15 27 45 / 0.06);
   --shadow-pop: 0 12px 32px -8px rgb(15 27 45 / 0.25), 0 2px 6px rgb(15 27 45 / 0.08);
   color-scheme: light;
 }
 
 
+/* Nối biến màu ở trên thành lớp Tailwind (vd --color-surface → bg-surface, text-surface). */
 @theme inline {
+  /* Phông chữ chính Be Vietnam Pro, dự phòng Arial. */
   --font-sans: var(--font-be-vietnam), Arial, Helvetica, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
@@ -97,16 +107,19 @@
   --color-sidebar-fg: var(--sidebar-fg);
   --color-sidebar-active: var(--sidebar-active);
 
+  /* Bóng đổ và bo góc thẻ. */
   --shadow-card: var(--shadow-card);
   --shadow-pop: var(--shadow-pop);
   --radius-card: 14px;
 }
 
+/* Nền và màu chữ toàn trang. */
 html,
 body {
   background: var(--bg);
   color: var(--fg);
 }
+/* Phông chữ, làm mịn chữ, tắt vệt xanh khi chạm trên điện thoại. */
 body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -118,14 +131,17 @@ body {
 }
 @layer base {
   /* Đặt trong layer base để class tiện ích (vd focus-visible:outline-none) ghi đè được. */
+  /* Viền xanh quanh phần tử đang chọn bằng bàn phím (Tab). */
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
 }
+/* Màu nền khi bôi đen chữ. */
 ::selection {
   background: var(--brand-100);
 }
+/* Khi in: ẩn phần có lớp no-print (thanh tiêu đề, nút…), nền trắng. */
 @media print {
   .no-print {
     display: none !important;

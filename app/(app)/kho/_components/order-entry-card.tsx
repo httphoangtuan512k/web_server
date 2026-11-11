@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: một dòng của bảng "Tổng hợp sản lượng theo đơn hàng" – nhập sản lượng từng máy, sang bao, ghi chú.
+ * Dùng ở: tab "Tổng hợp cuối ngày" của trang /kho.
+ */
 
 import { useState } from "react";
 import { api, errorMessage } from "@/lib/api";
@@ -9,10 +13,12 @@ import { useToast } from "@/components/ui/toast";
 import { KBtn, kTd, kTr } from "./kho-ui";
 import { num, type DailyEntryGroup, type DailySuggestion, type MachineQty } from "./types";
 
+// Kiểu ô nhập nhỏ trong bảng.
 const cellInput =
   "block w-full min-w-0 rounded-lg border border-[#c7d5e5] bg-white px-2 py-1.5 text-xs outline-none transition focus:border-[#7eadd9] focus:ring-3 focus:ring-[#d8eaff] disabled:bg-[#f4f7fb] disabled:text-[#66758a]";
 
 /** Một dòng của bảng "Tổng hợp sản lượng theo đơn hàng" (giống bảng .order-summary cũ). */
+// agg = các lần đã nhập hôm nay của đơn; editable = còn được sửa (có quyền, chưa chốt).
 export function OrderEntryRow({
   order,
   date,
@@ -28,28 +34,36 @@ export function OrderEntryRow({
 }) {
   const toast = useToast();
   const confirm = useConfirm();
+  // Danh sách máy của đơn (không có thì lấy từ các lần đã nhập).
   const machineNames = order.machines.length ? order.machines : Object.keys(agg?.machines || {});
+  // Giá trị các ô: sản lượng từng máy, sang bao, cộng dồn, ghi chú.
   const [qty, setQty] = useState<Record<string, string>>({});
   const [repack, setRepack] = useState("");
   const [cumulative, setCumulative] = useState(String(num(order.produced_cumulative)));
   const [note, setNote] = useState(order.note || "");
+  // Đang lưu lần nhập? Đang lưu cộng dồn?
   const [savingEntry, setSavingEntry] = useState(false);
   const [savingSum, setSavingSum] = useState(false);
 
+  // Tính số liệu hiển thị: tổng đơn, đã sản xuất, còn lại, sang bao hôm nay.
   const total = num(order.order_total);
   const produced = Number(cumulative);
   const producedOk = cumulative.trim() !== "" && Number.isFinite(produced) && produced >= 0;
   const remain = Math.max(0, total - (producedOk ? produced : 0));
   const todayRepack = num(agg?.repack);
 
+  // Nút "Lưu": kiểm tra số → gửi một lần nhập mới → xóa ô → tải lại.
   async function saveEntry() {
     if (!editable) return;
+    // Gom sản lượng từng máy thành danh sách gửi đi.
     const machines: MachineQty[] = machineNames.map((name) => ({ machineName: name, quantity: Number(qty[name]) || 0 }));
     const repackQty = Number(repack) || 0;
+    // Không cho số âm, phải nhập ít nhất một số.
     if (machines.some((m) => m.quantity < 0) || repackQty < 0) return toast.error("Sản lượng không được âm.");
     if (!machines.some((m) => m.quantity > 0) && repackQty <= 0) return toast.error("Bạn chưa nhập sản lượng hoặc sang bao.");
     setSavingEntry(true);
     try {
+      // Gửi lần nhập lên máy chủ.
       await api.post("/api/warehouse/daily-entry", { date, orderKey: order.order_key, orderNumber: order.order_number, machines, repackQty });
       toast.success("Đã lưu lần nhập mới. Số liệu được cộng dồn và giữ lịch sử riêng.");
       setQty({});
@@ -62,6 +76,7 @@ export function OrderEntryRow({
     }
   }
 
+  // Nút "Σ": hỏi xác nhận → lưu sản lượng cộng dồn + ghi chú của đơn.
   async function saveCumulative() {
     if (!editable) return;
     if (!producedOk) return toast.error("Khối lượng đã sản xuất không hợp lệ.");
@@ -77,6 +92,7 @@ export function OrderEntryRow({
     if (!ok) return;
     setSavingSum(true);
     try {
+      // Gửi số cộng dồn và ghi chú lên máy chủ.
       await api.put(`/api/warehouse/order-production/${encodeURIComponent(order.order_key)}`, { producedCumulative: produced, note });
       toast.success("Đã cập nhật sản lượng cộng dồn và ghi chú.");
       await onSaved();
@@ -90,12 +106,15 @@ export function OrderEntryRow({
   const td = cn(kTd, "px-2 text-xs");
   return (
     <tr className={kTr}>
+      {/* Số đơn hàng. */}
       <td className={cn(td, "text-center")}>
         <b className="inline-flex min-w-[34px] items-center justify-center rounded-[7px] bg-[#edf4fb] px-2 py-1 text-[#173e67]">{order.order_number}</b>
       </td>
+      {/* Bao bì, cỡ hạt, tổng đơn. */}
       <td className={cn(td, "text-[#40546b]")}>{order.packaging_code || "—"}</td>
       <td className={cn(td, "text-[#40546b]")}>{order.grain_size || "—"}</td>
       <td className={cn(td, "text-center font-bold whitespace-nowrap text-[#173e67] tabular-nums")}>{fmtNumber(total, 2, "0")} t</td>
+      {/* Ô sửa "Đã sản xuất" (cộng dồn). */}
       <td className={td}>
         <input
           type="number"
@@ -110,6 +129,7 @@ export function OrderEntryRow({
           className={cn(cellInput, "mx-auto min-h-9 max-w-[112px] border-[#a9bfd8] text-center text-[13px] font-bold text-[#173e67]")}
         />
       </td>
+      {/* Mỗi máy: tên máy + ô nhập tấn (gợi ý số đã nhập hôm nay). */}
       <td className={td}>
         {machineNames.length ? (
           <div className="flex flex-col gap-1.5">
@@ -141,6 +161,7 @@ export function OrderEntryRow({
           <span className="text-[#66758a]">Chưa có máy xác nhận vận hành</span>
         )}
       </td>
+      {/* Ô nhập sang bao. */}
       <td className={td}>
         <input
           type="number"
@@ -156,9 +177,11 @@ export function OrderEntryRow({
           className={cn(cellInput, "min-h-9 text-center")}
         />
       </td>
+      {/* Còn lại (nhãn vàng). */}
       <td className={cn(td, "text-center")}>
         <b className="inline-block rounded-[7px] bg-[#fff6e8] px-[7px] py-1 whitespace-nowrap text-[#9a5b0b] tabular-nums">{fmtNumber(remain, 2, "0")} t</b>
       </td>
+      {/* Ô ghi chú. */}
       <td className={td}>
         <input
           type="text"
@@ -171,6 +194,7 @@ export function OrderEntryRow({
           className={cn(cellInput, "min-h-9")}
         />
       </td>
+      {/* Nút "Lưu" (lần nhập) và "Σ" (sửa cộng dồn & ghi chú). */}
       <td className={cn(td, "px-1.5")}>
         <div className="flex flex-col gap-[5px]">
           <KBtn variant="green" size="sm" loading={savingEntry} disabled={!editable} onClick={saveEntry} title="Lưu sản lượng hôm nay" className="w-full px-1 text-[11px]">

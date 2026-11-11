@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: hộp "Tạo đơn hàng" / "Sửa đơn hàng" với 3 nhóm ô nhập và nút Lưu.
+ * Dùng ở: trang Kế hoạch (nút "+ Tạo đơn", nút "Sửa").
+ */
 
 import { ClipboardList, FlaskConical, ImageIcon, Loader2 } from "lucide-react";
 import { useId, useState } from "react";
@@ -11,6 +15,7 @@ import { useToast } from "@/components/ui/toast";
 import { BTN_PRIMARY, BTN_SECONDARY } from "./order-bits";
 import type { Order, OrderPayload } from "./types";
 
+// Giá trị form (số lượng giữ dạng chữ khi đang gõ).
 type FormValues = Omit<OrderPayload, "quantity"> & { quantity: string };
 
 /** Giá trị mặc định khi tạo đơn (như trang cũ). */
@@ -43,8 +48,10 @@ const SUGGEST: Partial<Record<keyof FormValues, string[]>> = {
   pallet: ["1 bao/pallet màng co, đai 2 dây, có shipping mark", "Không"],
 };
 
+// Đổi giá trị bất kỳ sang chữ (rỗng nếu không có).
 const str = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 
+/** Lấy giá trị đơn có sẵn để điền vào form khi sửa. */
 function fromOrder(o: Order): FormValues {
   return {
     orderNumber: str(o.orderNumber),
@@ -65,6 +72,7 @@ function fromOrder(o: Order): FormValues {
   };
 }
 
+/** Một nhóm ô trong form: tiêu đề nhỏ in hoa có icon + nội dung. */
 function Section({ icon: Icon, title, children }: { icon: typeof ClipboardList; title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-3">
@@ -82,6 +90,7 @@ function Section({ icon: Icon, title, children }: { icon: typeof ClipboardList; 
  * Render có điều kiện (mount = mở) để state form luôn mới.
  */
 export function OrderFormModal({ order, onClose, onSaved }: { order: Order | null; onClose: () => void; onSaved: () => Promise<void> | void }) {
+  // Mã cho form/gợi ý; giá trị form (sửa: điền sẵn, tạo: mặc định); đang lưu; đang sửa hay tạo.
   const toast = useToast();
   const formId = useId();
   const listPrefix = useId();
@@ -89,16 +98,19 @@ export function OrderFormModal({ order, onClose, onSaved }: { order: Order | nul
   const [saving, setSaving] = useState(false);
   const editing = !!order;
 
+  // Tạo hàm cập nhật 1 ô khi người dùng gõ.
   const set =
     <K extends keyof FormValues>(k: K) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setV((s) => ({ ...s, [k]: e.target.value }));
 
+  // Vẽ 1 ô nhập có nhãn (kèm danh sách gợi ý nếu có).
   const text = (
     k: keyof FormValues,
     label: string,
     opts: { required?: boolean; type?: string; placeholder?: string; className?: string; step?: string; min?: string } = {},
   ) => (
+    // Khung ô có nhãn.
     <Field label={label} required={opts.required} className={opts.className}>
       <Input
         value={v[k]}
@@ -111,6 +123,7 @@ export function OrderFormModal({ order, onClose, onSaved }: { order: Order | nul
         inputMode={opts.type === "number" ? "decimal" : undefined}
         list={SUGGEST[k] ? `${listPrefix}-${k}` : undefined}
       />
+      {/* Danh sách gợi ý thả xuống. */}
       {SUGGEST[k] ? (
         <datalist id={`${listPrefix}-${k}`}>
           {SUGGEST[k]!.map((s) => (
@@ -121,6 +134,7 @@ export function OrderFormModal({ order, onClose, onSaved }: { order: Order | nul
     </Field>
   );
 
+  /** Bấm "Lưu": kiểm tra ô bắt buộc, gửi tạo/sửa, báo kết quả rồi đóng hộp. */
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const qty = Number(v.quantity);
@@ -146,6 +160,7 @@ export function OrderFormModal({ order, onClose, onSaved }: { order: Order | nul
   }
 
   return (
+    // Hộp lớn: tiêu đề "Tạo đơn hàng" / "Sửa đơn hàng: …"; chân hộp nút "Hủy" xám + "Lưu" xanh.
     <Modal
       open
       onClose={onClose}
@@ -165,6 +180,7 @@ export function OrderFormModal({ order, onClose, onSaved }: { order: Order | nul
       }
     >
       <form id={formId} onSubmit={submit} className="space-y-6">
+        {/* Nhóm 1: thông tin đơn (số đơn, mã hàng, mã bao bì, số lượng, ngày xuất). */}
         <Section icon={ClipboardList} title="Thông tin đơn hàng">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {text("orderNumber", "Số đơn hàng", { required: true })}
@@ -175,6 +191,7 @@ export function OrderFormModal({ order, onClose, onSaved }: { order: Order | nul
           </div>
         </Section>
 
+        {/* Nhóm 2: quy cách sản phẩm. */}
         <Section icon={FlaskConical} title="Quy cách sản phẩm">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {text("whiteness", "Độ trắng sáng")}
@@ -188,6 +205,7 @@ export function OrderFormModal({ order, onClose, onSaved }: { order: Order | nul
           </div>
         </Section>
 
+        {/* Nhóm 3: lệnh chạy máy + ảnh bao bì. */}
         <Section icon={ImageIcon} title="Lệnh chạy máy & hình ảnh">
           <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
             <Field label="Lệnh chạy máy">

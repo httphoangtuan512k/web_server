@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: thanh tiêu đề trang (PageTopbar), nút trên thanh (TopbarLink/TopbarButton) và vùng nội dung (PageBody).
+ * Dùng ở: mọi trang chức năng (trừ trang chủ).
+ */
 
 import Link from "next/link";
 import { cn } from "@/lib/cn";
@@ -30,14 +34,17 @@ export function PageTopbar({
   className?: string;
 }) {
   return (
+    // Thanh tiêu đề dính trên cùng, nền theo `color`, chữ trắng.
     <header
       className={cn("no-print sticky top-0 z-30 flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-3 text-white shadow-md sm:px-5", className)}
       style={{ background: color }}
     >
+      {/* Bên trái: tiêu đề lớn + dòng phụ (nếu có). */}
       <div className="min-w-0 flex-1">
         <h1 className="truncate text-lg font-bold sm:text-xl">{title}</h1>
         {subtitle ? <p className="truncate text-xs text-white/75">{subtitle}</p> : null}
       </div>
+      {/* Bên phải: các nút của trang + nút "← Trang chủ". */}
       <div className="flex flex-wrap items-center justify-end gap-2">
         {actions}
         {backHref ? <TopbarLink href={backHref}>{backLabel}</TopbarLink> : null}
@@ -46,6 +53,7 @@ export function PageTopbar({
   );
 }
 
+// Kiểu nút trên thanh: viền trắng, nền trong mờ; rê chuột thì nền trắng chữ navy.
 const topbarBtn =
   "inline-flex min-h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-white/55 bg-white/10 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-white hover:text-[#172b3a] disabled:opacity-60";
 

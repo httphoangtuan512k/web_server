@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: thẻ "Hàng chờ vận hành" – 2 tab: đơn tạm dừng (Chạy tiếp) và đơn mới chờ chạy (Bắt đầu chạy).
+ * Dùng ở: trang Xưởng vận hành.
+ */
 
 import { CheckCircle2, Inbox, PencilLine, Play, RotateCw } from "lucide-react";
 import { useState } from "react";
@@ -9,8 +13,10 @@ import { Table, Td, Th, THead, Tr } from "@/components/ui/table";
 import { Tabs } from "@/components/ui/tabs";
 import { num, type OperatorPerms, type Order } from "./types";
 
+// Tab đang chọn: tạm dừng hoặc chờ chạy.
 type Tab = "paused" | "new";
 
+/** Các hàm xử lý khi bấm nút trên mỗi dòng (do trang cha truyền vào). */
 export interface QueueHandlers {
   onStart: (o: Order) => void;
   onResume: (o: Order) => void;
@@ -20,11 +26,13 @@ export interface QueueHandlers {
 
 /** Đơn tạm dừng (Chạy tiếp) và đơn mới chờ chạy (Bắt đầu chạy). */
 export function QueueTable({ paused, waiting, perms, handlers }: { paused: Order[]; waiting: Order[]; perms: OperatorPerms; handlers: QueueHandlers }) {
+  // Tab đang mở và danh sách đơn tương ứng.
   const [tab, setTab] = useState<Tab>("paused");
   const rows = tab === "paused" ? paused : waiting;
 
   return (
     <Card>
+      {/* Tiêu đề + 2 tab có số lượng đơn */}
       <CardHeader
         icon={RotateCw}
         title="Hàng chờ vận hành"
@@ -40,8 +48,10 @@ export function QueueTable({ paused, waiting, perms, handlers }: { paused: Order
           />
         }
       />
+      {/* Có đơn → bảng; không có → thông báo trống */}
       {rows.length ? (
         <Table maxHeight="520px">
+          {/* Hàng tiêu đề cột; tab Tạm dừng có thêm cột Đã chạy và Máy */}
           <THead>
             <tr>
               <Th>Số đơn</Th>
@@ -57,6 +67,7 @@ export function QueueTable({ paused, waiting, perms, handlers }: { paused: Order
             </tr>
           </THead>
           <tbody>
+            {/* Mỗi đơn một dòng */}
             {rows.map((o) => (
               <Tr key={o.id}>
                 <Td className="font-semibold">{o.orderNumber}</Td>
@@ -69,6 +80,7 @@ export function QueueTable({ paused, waiting, perms, handlers }: { paused: Order
                 {tab === "paused" ? <Td>{o.machineName || "—"}</Td> : null}
                 <Td className="num text-muted">{fmtDateTime(tab === "paused" ? o.updatedAt : o.createdAt)}</Td>
                 <Td>
+                  {/* Nút thao tác – chỉ hiện nút người dùng có quyền */}
                   <div className="flex justify-end gap-2">
                     {tab === "paused" && perms.canOperate ? (
                       <Button size="md" variant="success" icon={Play} onClick={() => handlers.onResume(o)}>
@@ -88,6 +100,7 @@ export function QueueTable({ paused, waiting, perms, handlers }: { paused: Order
                     {perms.isSuper ? (
                       <Button size="icon" variant="ghost" icon={PencilLine} onClick={() => handlers.onEdit(o)} aria-label="Sửa toàn bộ" title="Sửa toàn bộ" />
                     ) : null}
+                    {/* Không có quyền gì → chữ "Chỉ xem" */}
                     {!perms.canOperate && !perms.isSuper && !(tab === "paused" && perms.canConfirm) ? <span className="text-[13px] text-muted">Chỉ xem</span> : null}
                   </div>
                 </Td>

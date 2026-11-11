@@ -1,5 +1,6 @@
 /**
- * SUPER WHITE – schema Postgres (Neon) khai báo bằng Drizzle ORM.
+ * File này: bản thiết kế mọi bảng của DB (Postgres/Neon) viết bằng Drizzle ORM – SUPER WHITE.
+ * Dùng ở: db.service.ts (truy vấn có kiểu), drizzle.config.ts (sinh migration), các script.
  *
  * Đây là NGUỒN DUY NHẤT của cấu trúc DB. Quy trình nâng cấp:
  *   1. Sửa file này
@@ -33,31 +34,40 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
+// Cột thời điểm có múi giờ (timestamptz).
 const tz = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
+// Cột created_at: tự điền lúc tạo dòng.
 const createdAt = () => tz('created_at').notNull().defaultNow();
+// Cột updated_at: tự cập nhật mỗi lần sửa dòng.
 const updatedAt = () =>
   tz('updated_at')
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date());
+// Cột số lượng (số thực), mặc định 0.
 const qty = (name: string) => doublePrecision(name).notNull().default(0);
+// Khóa chính id: số nguyên tự tăng.
 const id = () => integer('id').primaryKey().generatedByDefaultAsIdentity();
 
 /** Quyền trang: kehoach, vanhanh, kcs, xuathang, kho, kho_edit, baotri. */
 export const PAGE_PERMISSIONS = ['kehoach', 'vanhanh', 'kcs', 'xuathang', 'kho', 'kho_edit', 'baotri'] as const;
 /** Quyền thao tác đơn hàng: new (tạo), edit (sửa), vanhanh (chạy), xacnhan (xác nhận hoàn thành). */
 export const ORDER_PERMISSIONS = ['new', 'edit', 'vanhanh', 'xacnhan'] as const;
+/** Trạng thái đơn: mới / đang chạy / hoàn thành. */
 export const ORDER_STATUSES = ['new', 'running', 'completed'] as const;
+/** Nhóm hàng trong kho: thành phẩm / bao bì / vật tư. */
 export const WAREHOUSE_CATEGORIES = ['goods', 'packaging', 'materials'] as const;
 
 // =====================================================================================
 // NGƯỜI DÙNG & PHIÊN
 // =====================================================================================
+/** Tài khoản người dùng. */
 export const users = pgTable(
   'users',
   {
     id: id(),
     username: text('username').notNull().unique(),
+    // Mật khẩu đã băm bằng bcrypt (không lưu mật khẩu gốc).
     passwordHash: text('password_hash').notNull(),
     fullName: text('full_name').notNull().default(''),
     position: text('position').notNull().default(''),
@@ -65,11 +75,13 @@ export const users = pgTable(
     role: text('role').notNull().default('user'), // 'user' | 'admin'
     isSuper: boolean('is_super').notNull().default(false),
     isActive: boolean('is_active').notNull().default(true),
+    // Danh sách quyền trang / quyền đơn hàng (mảng chữ).
     pagePermissions: text('page_permissions').array().notNull().default(sql`'{}'::text[]`),
     orderPermissions: text('order_permissions').array().notNull().default(sql`'{}'::text[]`),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
+  // Ràng buộc: role chỉ được là 'user' hoặc 'admin'.
   (t) => [check('users_role_check', sql`${t.role} IN ('user','admin')`)],
 );
 
@@ -78,24 +90,29 @@ export const userSessions = pgTable(
   'user_sessions',
   {
     id: id(),
+    // sha256 của mã phiên trong cookie.
     sessionKey: text('session_key').notNull().unique(),
+    // Xóa user thì để trống user_id, vẫn giữ phiên.
     userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
     username: text('username').notNull(),
     fullName: text('full_name').notNull().default(''),
     role: text('role').notNull().default('user'),
     isSuper: boolean('is_super').notNull().default(false),
+    // Giờ đăng nhập, lần hoạt động cuối, giờ đăng xuất (null = còn mở).
     loginAt: tz('login_at').notNull().defaultNow(),
     lastSeenAt: tz('last_seen_at').notNull().defaultNow(),
     logoutAt: tz('logout_at'),
     ipAddress: text('ip_address').notNull().default(''),
     userAgent: text('user_agent').notNull().default(''),
   },
+  // Chỉ mục (index) giúp tìm phiên nhanh theo người/thời gian.
   (t) => [index('user_sessions_user_login_idx').on(t.userId, t.loginAt.desc()), index('user_sessions_login_idx').on(t.loginAt.desc())],
 );
 
 // =====================================================================================
 // ĐƠN HÀNG (KẾ HOẠCH / VẬN HÀNH)
 // =====================================================================================
+/** Đơn hàng sản xuất (kế hoạch → vận hành → hoàn thành). */
 export const orders = pgTable(
   'orders',
   {
@@ -106,6 +123,7 @@ export const orders = pgTable(
     groupId: text('group_id')
       .notNull()
       .generatedAlwaysAs(sql`COALESCE(parent_order_id, id)`),
+    // Thông tin đơn: số đơn, mã hàng, bao bì, số lượng (tấn), ảnh, chỉ tiêu kỹ thuật…
     orderNumber: text('order_number').notNull(),
     itemCode: text('item_code').notNull().default(''),
     packagingCode: text('packaging_code').notNull().default(''),
@@ -120,23 +138,28 @@ export const orders = pgTable(
     pallet: text('pallet').notNull().default(''),
     extraBag: text('extra_bag').notNull().default(''),
     orderCommand: text('order_command').notNull().default(''),
+    // Máy chạy; sản lượng chạy trên máy / thực tế / kho bù.
     machineName: text('machine_name').notNull().default(''),
     runOnMachine: qty('run_on_machine'),
     actualProduced: qty('actual_produced'),
     khoBu: qty('kho_bu'),
+    // Trạng thái và cờ tạm dừng.
     status: text('status').notNull().default('new'),
     isPaused: boolean('is_paused').notNull().default(false),
     exportDate: text('export_date').notNull().default(''),
+    // Tên người tạo / chạy / xác nhận / kho (lưu cứng để lịch sử không đổi).
     creatorName: text('creator_name').notNull().default(''),
     runnerName: text('runner_name').notNull().default(''),
     confirmerName: text('confirmer_name').notNull().default(''),
     khoName: text('kho_name').notNull().default(''),
+    // Id người tạo/sửa; xóa user thì để trống.
     createdBy: integer('created_by').references(() => users.id, { onDelete: 'set null' }),
     updatedBy: integer('updated_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     completedAt: tz('completed_at'),
   },
+  // Ràng buộc trạng thái hợp lệ + chỉ mục tìm nhanh.
   (t) => [
     check('orders_status_check', sql`${t.status} IN ('new','running','completed')`),
     index('orders_group_idx').on(t.groupId),
@@ -156,6 +179,7 @@ export const orderHistory = pgTable(
     machineName: text('machine_name').notNull().default(''),
     userName: text('user_name').notNull(),
     action: text('action').notNull(),
+    // Giá trị trước và sau khi thay đổi.
     oldValue: doublePrecision('old_value').default(0),
     newValue: doublePrecision('new_value').default(0),
     createdAt: createdAt(),
@@ -188,6 +212,7 @@ export const auditLogs = pgTable(
     actionType: text('action_type').notNull(),
     targetId: text('target_id'),
     orderNumber: text('order_number').notNull().default(''),
+    // Chi tiết thay đổi dạng JSON.
     details: jsonb('details'),
     actor: text('actor').notNull(),
     actorId: integer('actor_id').references(() => users.id, { onDelete: 'set null' }),
@@ -199,6 +224,7 @@ export const auditLogs = pgTable(
 // =====================================================================================
 // BẢO TRÌ
 // =====================================================================================
+/** Phiếu bảo trì: thiết bị, mô tả lỗi, ảnh trước/sau, nội dung sửa. */
 export const maintenanceRecords = pgTable(
   'maintenance_records',
   {
@@ -242,6 +268,7 @@ export const warehouseItems = pgTable(
   ],
 );
 
+/** Lịch sử nhập/xuất kho. */
 export const warehouseTransactions = pgTable(
   'warehouse_transactions',
   {
@@ -273,6 +300,7 @@ export const warehouseDailyEntries = pgTable(
   (t) => [index('warehouse_daily_entries_date_order_idx').on(t.workDate, t.orderKey), index('warehouse_daily_entries_order_idx').on(t.orderKey)],
 );
 
+/** Số lượng từng máy trong phiếu nhập sản lượng (xóa phiếu thì xóa theo). */
 export const warehouseDailyEntryLines = pgTable(
   'warehouse_daily_entry_lines',
   {
@@ -286,6 +314,7 @@ export const warehouseDailyEntryLines = pgTable(
   (t) => [index('warehouse_daily_entry_lines_entry_idx').on(t.entryId)],
 );
 
+/** Chốt sổ kho theo ngày (mỗi ngày 1 lần). */
 export const warehouseDailyClosings = pgTable('warehouse_daily_closings', {
   id: id(),
   workDate: date('work_date', { mode: 'string' }).notNull().unique(),
@@ -293,6 +322,7 @@ export const warehouseDailyClosings = pgTable('warehouse_daily_closings', {
   closedAt: tz('closed_at').notNull().defaultNow(),
 });
 
+/** Số liệu từng đơn tại lần chốt sổ. */
 export const warehouseDailyClosingLines = pgTable(
   'warehouse_daily_closing_lines',
   {
@@ -304,6 +334,7 @@ export const warehouseDailyClosingLines = pgTable(
     orderNumber: text('order_number').notNull().default(''),
     packagingCode: text('packaging_code').notNull().default(''),
     grainSize: text('grain_size').notNull().default(''),
+    // Tổng đơn, sản xuất hôm nay/lũy kế, đóng lại hôm nay/lũy kế, còn lại.
     orderTotal: qty('order_total'),
     producedToday: qty('produced_today'),
     producedCumulative: qty('produced_cumulative'),
@@ -315,6 +346,7 @@ export const warehouseDailyClosingLines = pgTable(
   (t) => [unique('warehouse_daily_closing_lines_uq').on(t.closingId, t.orderKey)],
 );
 
+/** Bản chụp số liệu kho theo ngày, có số phiên bản. */
 export const warehouseDailySnapshots = pgTable(
   'warehouse_daily_snapshots',
   {
@@ -342,10 +374,12 @@ export const warehouseProductionBaselines = pgTable('warehouse_production_baseli
 /** Thiết bị PLC + API key + bản tin mới nhất (thay cho các Map trong RAM của server cũ). */
 export const plcDevices = pgTable('plc_devices', {
   deviceId: text('device_id').primaryKey(), // 'MAY_B'
+  // API key chỉ lưu bản băm; cờ còn hiệu lực, ngày tạo/thu hồi.
   apiKeyHash: text('api_key_hash'),
   apiKeyActive: boolean('api_key_active').notNull().default(false),
   apiKeyCreatedAt: tz('api_key_created_at'),
   apiKeyRevokedAt: tz('api_key_revoked_at'),
+  // Bản tin mới nhất và thời điểm nhận.
   lastPayload: jsonb('last_payload'),
   lastReceivedAt: tz('last_received_at'),
   lastHistoryAt: tz('last_history_at'),
@@ -379,6 +413,7 @@ export const plcTelemetryHistory = pgTable(
 // =====================================================================================
 // TÀI LIỆU EXCEL DÙNG CHUNG
 // =====================================================================================
+/** File Excel dùng chung (file thật trên Blob). */
 export const documents = pgTable(
   'documents',
   {
@@ -389,6 +424,7 @@ export const documents = pgTable(
     sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull().default(0),
     ownerId: integer('owner_id').references(() => users.id, { onDelete: 'set null' }),
     ownerName: text('owner_name').notNull().default(''),
+    // Xóa mềm: chỉ đánh dấu, không xóa thật.
     isDeleted: boolean('is_deleted').notNull().default(false),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
@@ -396,6 +432,7 @@ export const documents = pgTable(
   (t) => [index('documents_owner_idx').on(t.ownerId)],
 );
 
+/** Quyền xem/sửa tài liệu của từng người. */
 export const documentPermissions = pgTable(
   'document_permissions',
   {
@@ -410,12 +447,14 @@ export const documentPermissions = pgTable(
     grantedAt: tz('granted_at').notNull().defaultNow(),
   },
   (t) => [
+    // Khóa chính 2 cột: mỗi người 1 quyền trên 1 tài liệu.
     primaryKey({ columns: [t.documentId, t.userId] }),
     check('document_permissions_check', sql`${t.permission} IN ('view','edit')`),
     index('document_permissions_user_idx').on(t.userId),
   ],
 );
 
+/** Khóa tài liệu khi có người đang sửa (tự hết hạn). */
 export const documentLocks = pgTable('document_locks', {
   documentId: uuid('document_id')
     .primaryKey()
@@ -427,6 +466,7 @@ export const documentLocks = pgTable('document_locks', {
   expiresAt: tz('expires_at').notNull(),
 });
 
+/** Nhật ký thao tác trên tài liệu. */
 export const documentActivityLogs = pgTable(
   'document_activity_logs',
   {

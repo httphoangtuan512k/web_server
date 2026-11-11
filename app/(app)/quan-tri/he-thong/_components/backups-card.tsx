@@ -1,4 +1,6 @@
 "use client";
+// File này: thẻ "Sao lưu dữ liệu" – xem danh sách bản sao lưu, tạo mới, tải về.
+// Dùng ở: trang Hệ thống (chỉ Super Admin).
 
 import { Archive } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -10,6 +12,7 @@ import { OgButton, OgCard, OgCardTitle, OgEmptyBox, OgPill } from "../../_shared
 import { useApiData } from "../../_shared/use-api-data";
 import type { BackupCreateResponse, BackupItem, BackupListResponse } from "./types";
 
+// Nhãn và màu cho từng loại bản sao lưu.
 const KIND: Record<string, { label: string; tone: "default" | "ok" | "muted" }> = {
   daily: { label: "Hằng ngày", tone: "ok" },
   manual: { label: "Thủ công", tone: "default" },
@@ -19,9 +22,11 @@ const KIND: Record<string, { label: string; tone: "default" | "ok" | "muted" }> 
 
 /** Tên dạng 'YYYY-MM-DD_<loại>_HHMMSS' → loại. */
 function kindOf(name: string) {
+  // Dò loại trong tên file; không thấy thì trả rỗng.
   const m = /_(daily|manual|startup|cron)[_.-]/i.exec(name) || /^(daily|manual|startup|cron)/i.exec(name.split("/").pop() || "");
   return m ? m[1].toLowerCase() : "";
 }
+// Đường dẫn file để tải về, và tên ngắn để hiển thị.
 const pathOf = (b: BackupItem) => b.pathname || b.path || b.name;
 const displayName = (b: BackupItem) => (b.name || pathOf(b)).split("/").pop() || b.name;
 
@@ -29,17 +34,22 @@ const displayName = (b: BackupItem) => (b.name || pathOf(b)).split("/").pop() ||
 export function BackupsCard() {
   const toast = useToast();
   const confirm = useConfirm();
+  // Tải danh sách bản sao lưu.
   const { data, error, loading, reload } = useApiData<BackupListResponse | BackupItem[]>("/api/superadmin/backups");
+  // Đang tạo bản sao lưu; file đang tải về.
   const [creating, setCreating] = useState(false);
   const [downloading, setDownloading] = useState("");
 
+  // Chấp nhận cả 2 dạng trả về: mảng hoặc { rows }.
   const rows = useMemo<BackupItem[] | null>(() => (data ? (Array.isArray(data) ? data : data.rows ?? []) : null), [data]);
 
+  // Nút "Làm mới": tải lại, lỗi thì báo.
   const refresh = async () => {
     const err = await reload();
     if (err) toast.error(err);
   };
 
+  // "Sao lưu ngay": hỏi xác nhận, gọi máy chủ tạo bản mới, tải lại.
   async function create() {
     const ok = await confirm({
       title: "Tạo bản sao lưu ngay?",
@@ -59,6 +69,7 @@ export function BackupsCard() {
     }
   }
 
+  // Tải một bản sao lưu về máy.
   async function download(b: BackupItem) {
     const p = pathOf(b);
     setDownloading(p);
@@ -71,10 +82,12 @@ export function BackupsCard() {
     }
   }
 
+  // Bản mới nhất (đứng đầu danh sách).
   const latest = rows?.[0];
 
   return (
     <OgCard>
+      {/* Tiêu đề + thống kê + nút Làm mới / Sao lưu ngay */}
       <OgCardTitle
         title="Sao lưu dữ liệu"
         help={
@@ -106,6 +119,7 @@ export function BackupsCard() {
         }
       />
 
+      {/* Lỗi / đang tải / trống / danh sách bản sao lưu */}
       {error && !rows ? (
         <OgEmptyBox tone="error">{error}</OgEmptyBox>
       ) : !rows ? (
@@ -115,13 +129,16 @@ export function BackupsCard() {
       ) : (
         <ul className="max-h-[440px] divide-y divide-[#edf0f4] overflow-y-auto rounded-lg border border-[#e2e8f0]">
           {rows.map((b) => {
+            // Loại và đường dẫn của bản này.
             const k = KIND[kindOf(b.name)];
             const p = pathOf(b);
             return (
               <li key={p} className="flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-[#f8fafc] sm:px-4">
+                {/* Biểu tượng hộp lưu trữ (ẩn trên màn hình rất hẹp) */}
                 <span className="hidden h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#eaf1f6] text-[#244d68] min-[420px]:grid">
                   <Archive size={16} />
                 </span>
+                {/* Tên file; dưới là thời gian, dung lượng, loại */}
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-mono text-[13px]" title={p}>
                     {displayName(b)}
@@ -132,6 +149,7 @@ export function BackupsCard() {
                     {k ? <OgPill tone={k.tone}>{k.label}</OgPill> : null}
                   </p>
                 </div>
+                {/* Nút tải về (khóa các nút khác khi đang tải một file) */}
                 <OgButton
                   size="sm"
                   loading={downloading === p}

@@ -1,3 +1,5 @@
+// File này: khai báo hình dạng dữ liệu của trang Dữ liệu gốc (bảng, cột, dòng).
+// Dùng ở: các component trang Dữ liệu gốc.
 /** GET /api/super-data/tables */
 export interface SuperTable {
   name: string;
@@ -12,8 +14,10 @@ export interface SuperColumn {
   pk: boolean;
 }
 
+// Giá trị một ô: chữ, số, đúng/sai, rỗng, hoặc dữ liệu JSON.
 export type CellValue = string | number | boolean | null | Record<string, unknown> | unknown[];
 
+// Một dòng: khóa chính (để nhận diện) + giá trị các cột.
 export interface SuperRow {
   /** Giá trị khóa chính – gửi nguyên lại khi PATCH/DELETE. */
   key: Record<string, CellValue>;

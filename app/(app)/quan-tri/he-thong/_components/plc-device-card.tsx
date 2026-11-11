@@ -1,4 +1,6 @@
 "use client";
+// File này: thẻ "Quản lý kết nối PLC – Máy B": xem trạng thái kết nối, tạo/cấp lại/thu hồi API Key.
+// Dùng ở: trang Hệ thống (chỉ Super Admin).
 
 import { PlugZap } from "lucide-react";
 import { useState } from "react";
@@ -13,8 +15,10 @@ import { useVisibleInterval } from "../../_shared/use-visible-interval";
 import { copyText } from "../../_shared/utils";
 import type { PlcDeviceStatus, PlcKeyResponse } from "./types";
 
+// Chữ trạng thái: Online / Mất kết nối / Chưa kết nối.
 const connText = (s: PlcDeviceStatus) => (s.connected ? "Online" : s.last_received_at ? "Mất kết nối" : "Chưa kết nối");
 
+// Một dòng thông tin: nhãn bên trái, giá trị bên phải.
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex min-w-0 items-start justify-between gap-4 border-b border-[#edf0f4] py-2.5 last:border-b-0">
@@ -28,7 +32,9 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export function PlcDeviceCard() {
   const toast = useToast();
   const confirm = useConfirm();
+  // Tải trạng thái thiết bị PLC.
   const { data: s, error, loading, reload } = useApiData<PlcDeviceStatus>("/api/superadmin/plc-device");
+  // Đang tạo/thu hồi; key vừa tạo (chỉ hiện 1 lần); đã sao chép chưa.
   const [busy, setBusy] = useState<"" | "create" | "revoke">("");
   const [newKey, setNewKey] = useState<PlcKeyResponse | null>(null);
   const [copied, setCopied] = useState(false);
@@ -36,6 +42,7 @@ export function PlcDeviceCard() {
   // Cập nhật trạng thái kết nối định kỳ (dừng khi tab ẩn).
   useVisibleInterval(() => void reload(), 5000);
 
+  // Tạo/cấp lại key: hỏi xác nhận, gọi máy chủ, hiện key mới.
   async function createKey() {
     const ok = await confirm({
       title: s?.key_active ? "Cấp lại API Key mới?" : "Tạo API Key cho máy B?",
@@ -60,6 +67,7 @@ export function PlcDeviceCard() {
     }
   }
 
+  // Thu hồi key: hỏi xác nhận, gọi máy chủ, ẩn key.
   async function revokeKey() {
     const ok = await confirm({
       title: "Thu hồi API Key của máy B?",
@@ -81,6 +89,7 @@ export function PlcDeviceCard() {
     }
   }
 
+  // Sao chép key mới vào bộ nhớ tạm.
   async function copy() {
     if (!newKey) return;
     if (await copyText(newKey.api_key)) {
@@ -91,6 +100,7 @@ export function PlcDeviceCard() {
 
   return (
     <OgCard>
+      {/* Tiêu đề + nút Làm mới */}
       <OgCardTitle
         title="Quản lý kết nối PLC – Máy B"
         help="Cấp API Key cho phần mềm C# trên máy B để gửi dữ liệu PLC lên SUPER WHITE."
@@ -108,6 +118,7 @@ export function PlcDeviceCard() {
         }
       />
 
+      {/* Chưa có dữ liệu: hiện đang tải hoặc lỗi */}
       {!s ? (
         <p className={cn("rounded-lg border border-dashed border-[#dce3e9] px-4 py-6 text-center text-sm", error ? "text-[#b42318]" : "text-[#64748b]")}>
           {error || "Đang tải trạng thái..."}
@@ -123,8 +134,10 @@ export function PlcDeviceCard() {
               : "Chưa có API Key hoạt động. Hãy tạo khóa cho máy B."}
           </p>
 
+          {/* Hai khối: trạng thái máy B (trái) và thông tin key (phải) */}
           <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
             <div className="flex items-center gap-4 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-4">
+              {/* Vòng tròn biểu tượng: xanh = online, đỏ = mất kết nối, xám = chưa kết nối */}
               <span
                 className={cn(
                   "grid h-12 w-12 shrink-0 place-items-center rounded-full",
@@ -134,6 +147,7 @@ export function PlcDeviceCard() {
                 <PlugZap size={22} />
               </span>
               <div className="min-w-0 flex-1">
+                {/* Tên thiết bị + nhãn trạng thái */}
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-bold">{s.device_id || "MAY_B"}</p>
                   <OgPill tone={s.connected ? "ok" : s.last_received_at ? "off" : "muted"}>
@@ -141,6 +155,7 @@ export function PlcDeviceCard() {
                     {connText(s)}
                   </OgPill>
                 </div>
+                {/* Lần nhận dữ liệu cuối */}
                 <p className="mt-1 text-[13px] text-[#64748b]">
                   {s.last_received_at ? (
                     <>
@@ -154,6 +169,7 @@ export function PlcDeviceCard() {
               </div>
             </div>
 
+            {/* Bảng thông tin key */}
             <dl className="rounded-lg border border-[#e2e8f0] px-4 py-1">
               <Row label="API Key">
                 {s.key_active ? <OgPill tone="ok">Đang hoạt động</OgPill> : s.key_revoked_at ? <OgPill tone="off">Đã thu hồi</OgPill> : <OgPill tone="muted">Chưa tạo</OgPill>}
@@ -173,6 +189,7 @@ export function PlcDeviceCard() {
             </dl>
           </div>
 
+          {/* Key mới tạo: ô chứa key + nút sao chép / ẩn */}
           {newKey ? (
             <div className="mt-4 rounded-lg border border-[#cbd5e1] bg-[#f8fafc] p-4">
               <strong className="text-sm">API Key mới – chỉ hiển thị lần này</strong>
@@ -197,6 +214,7 @@ export function PlcDeviceCard() {
         </>
       )}
 
+      {/* Nút Tạo/Cấp lại và Thu hồi API Key */}
       <div className="mt-4 flex flex-wrap gap-2">
         <OgButton variant="primary" disabled={!s || !!busy} loading={busy === "create"} onClick={createKey}>
           Tạo / Cấp lại API Key
@@ -205,6 +223,7 @@ export function PlcDeviceCard() {
           Thu hồi API Key
         </OgButton>
       </div>
+      {/* Ghi chú: tên thiết bị, địa chỉ API, chu kỳ gửi */}
       <p className="mt-3 text-xs text-[#64748b]">
         Thiết bị: {s?.device_id || "MAY_B"} · API nhận dữ liệu: <code className="font-mono">/api/plc/telemetry</code> · Chu kỳ dự kiến: 1 giây.
       </p>

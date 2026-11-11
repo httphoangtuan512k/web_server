@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: hộp xem ảnh bao bì của đơn hàng cỡ lớn.
+ * Dùng ở: trang Kế hoạch, khi bấm vào ảnh đơn.
+ */
 
 import { ExternalLink } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
@@ -6,6 +10,7 @@ import { Modal } from "@/components/ui/modal";
 /** Xem ảnh bao bì cỡ lớn. */
 export function ImageViewer({ src, title, onClose }: { src: string; title: string; onClose: () => void }) {
   return (
+    // Hộp thoại toàn màn hình; chân hộp có nút "Mở ảnh gốc" (mở tab mới).
     <Modal
       open
       onClose={onClose}
@@ -23,6 +28,7 @@ export function ImageViewer({ src, title, onClose }: { src: string; title: strin
         </a>
       }
     >
+      {/* Ảnh lớn ở giữa; bấm vào ảnh để đóng. */}
       <button
         type="button"
         onClick={onClose}

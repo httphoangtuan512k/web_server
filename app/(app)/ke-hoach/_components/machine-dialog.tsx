@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: hộp hỏi tên máy khi bấm "▶ Chạy", "▶ Chạy tiếp", "▶ Chạy thêm máy".
+ * Dùng ở: trang Kế hoạch (thay cho hộp prompt() của trang cũ).
+ */
 
 import { useId, useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -8,6 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { BTN_BASE, BTN_SECONDARY } from "./order-bits";
 import type { OrderGroup } from "./types";
 
+// 3 kiểu hỏi tên máy: Chạy / Chạy tiếp / Chạy thêm máy.
 export type MachineDialogKind = "start" | "resume" | "addMachine";
 
 /** Chữ theo prompt() trang cũ; nút xác nhận cùng chữ & màu với nút trên dòng đơn. */
@@ -33,13 +38,17 @@ export function MachineDialog({
   onClose: () => void;
   onSubmit: (machineName: string) => Promise<boolean>;
 }) {
+  // Chữ theo kiểu; mã cho danh sách gợi ý và form.
   const t = TEXT[kind];
   const listId = useId();
   const formId = useId();
+  // Tên máy đang nhập (Chạy tiếp: điền sẵn máy cũ) và lỗi.
   const [name, setName] = useState(kind === "resume" ? group.machineName || "" : "");
   const [error, setError] = useState("");
+  // Các máy đang chạy đơn này.
   const running = group.machineNames.filter(Boolean);
 
+  /** Bấm nút xác nhận: bắt buộc nhập tên máy rồi gửi đi. */
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const v = name.trim();
@@ -49,6 +58,7 @@ export function MachineDialog({
   }
 
   return (
+    // Hộp nhỏ: tiêu đề "▶ Chạy…", dòng phụ số đơn; chân hộp nút "Hủy" + nút xác nhận màu (xanh dương / xanh lá).
     <Modal
       open
       onClose={onClose}
@@ -67,6 +77,7 @@ export function MachineDialog({
         </>
       }
     >
+      {/* Ô nhập tên máy (gõ hoặc chọn gợi ý); dưới ô ghi các máy đang chạy. */}
       <form id={formId} onSubmit={submit} className="space-y-3">
         <Field label={t.label} required error={error} hint={running.length ? `Đang chạy trên: ${running.join(", ")}` : undefined}>
           <Input
@@ -80,11 +91,13 @@ export function MachineDialog({
             }}
           />
         </Field>
+        {/* Danh sách gợi ý thả xuống của ô nhập. */}
         <datalist id={listId}>
           {suggestions.map((s) => (
             <option key={s} value={s} />
           ))}
         </datalist>
+        {/* Tối đa 8 nút tên máy gợi ý; bấm để điền nhanh. */}
         {suggestions.length ? (
           <div className="flex flex-wrap gap-1.5">
             {suggestions.slice(0, 8).map((s) => (

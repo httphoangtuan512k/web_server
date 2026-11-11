@@ -1,3 +1,7 @@
+/**
+ * File này: "bảo vệ" (Guard) chạy trước MỌI API – kiểm tra đăng nhập và quyền.
+ * Dùng ở: auth.module.ts đăng ký làm guard toàn cục (APP_GUARD).
+ */
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { and, eq, getTableColumns, isNull } from 'drizzle-orm';
@@ -18,19 +22,24 @@ const { users, userSessions } = schema;
 @Injectable()
 export class AuthGuard implements CanActivate {
   constructor(
+    // Reflector: đọc các "nhãn" (@Public, @RequireAdmin…) gắn trên route.
     private readonly reflector: Reflector,
     private readonly db: DbService,
     private readonly sessions: SessionService,
   ) {}
 
+  /** Trả true = cho qua; ném ApiError 401/403 = chặn. */
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
+    // Route có nhãn @Public thì cho qua luôn.
     const targets = [ctx.getHandler(), ctx.getClass()];
     if (this.reflector.getAllAndOverride<boolean>(PUBLIC_KEY, targets)) return true;
 
+    // Đọc và kiểm tra chữ ký cookie phiên.
     const req = ctx.switchToHttp().getRequest<Request & { user?: DbUser; sessionKey?: string }>();
     const payload = this.sessions.read(req);
     if (!payload) throw new ApiError(401, 'Vui lòng đăng nhập.');
 
+    // Tìm phiên còn hiệu lực (chưa đăng xuất, đúng người) kèm thông tin người dùng (JOIN 2 bảng).
     const sessionKey = SessionService.sessionKey(payload.sid);
     const [row] = await this.db.orm
       .select({ user: getTableColumns(users), lastSeenAt: userSessions.lastSeenAt })
@@ -45,6 +54,7 @@ export class AuthGuard implements CanActivate {
       this.sessions.clearCookie(ctx.switchToHttp().getResponse());
       throw new ApiError(401, 'Tài khoản không hoạt động.');
     }
+    // Gắn người dùng vào request cho controller dùng.
     req.user = row.user;
     req.sessionKey = sessionKey;
 
@@ -58,11 +68,13 @@ export class AuthGuard implements CanActivate {
         .catch(() => undefined);
     }
 
+    // Kiểm tra nhãn quyền: admin / super admin.
     const role = this.reflector.getAllAndOverride<'admin' | 'super' | undefined>(ROLE_KEY, targets);
     if (role === 'admin' && !isAdminUser(req.user)) throw new ApiError(403, 'Không có quyền quản trị.');
     if (role === 'super' && !(req.user.isActive && req.user.isSuper)) {
       throw new ApiError(403, 'Chỉ Super Admin mới được sử dụng chức năng này.');
     }
+    // Kiểm tra quyền vào trang (@RequirePage).
     const page = this.reflector.getAllAndOverride<PageName | undefined>(PAGE_KEY, targets);
     if (page && !hasPage(req.user, page)) throw new ApiError(403, 'Bạn không có quyền truy cập trang này.');
     return true;

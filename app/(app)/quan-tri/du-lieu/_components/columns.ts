@@ -1,3 +1,5 @@
+// File này: xử lý cột của trang Dữ liệu gốc – tên tiếng Việt, đoán kiểu ô, đổi giá trị để hiển thị/sửa.
+// Dùng ở: bảng dữ liệu (data-grid) và hộp sửa dòng (row-editor-modal).
 import { fmtDateTime } from "@/lib/format";
 import { fromVnInputValue, toVnInputValue } from "../../_shared/utils";
 import type { CellValue, ColumnKind, SuperColumn } from "./types";
@@ -112,25 +114,30 @@ const LABELS: Record<string, string> = {
   content_type: "Loại file",
 };
 
+// Tên cột tiếng Việt; không có trong bảng thì đổi "ten_cot" → "Ten Cot".
 export function labelOf(name: string) {
   return LABELS[name] || name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+// Nhãn trạng thái đơn và các cột luôn coi là đúng/sai.
 const STATUS_LABEL: Record<string, string> = { new: "Mới tạo", running: "Đang chạy", completed: "Hoàn thành" };
 const BOOL_COLUMNS = new Set(["active", "is_active", "is_super", "is_paused"]);
 
 /** Xác định kiểu input theo kiểu SQL (+ giá trị mẫu để dự phòng). */
 export function kindOf(col: SuperColumn, sample?: CellValue): ColumnKind {
   const t = (col.type || "").toLowerCase().trim();
+  // Dò theo kiểu SQL trước: đúng/sai, JSON, ngày giờ, ngày, số.
   if (/^bool/.test(t) || BOOL_COLUMNS.has(col.name)) return "boolean";
   if (/json/.test(t) || /^_|\[\]$|^array/.test(t)) return "json";
   if (/timestamp|timestamptz/.test(t)) return "datetime";
   if (t === "date") return "date";
   if (t === "interval") return "text";
   if (/int|real|floa|doub|num|dec|serial|money/.test(t)) return "number";
+  // Không rõ kiểu SQL → đoán theo giá trị mẫu.
   if (typeof sample === "boolean") return "boolean";
   if (typeof sample === "number") return "number";
   if (sample !== null && typeof sample === "object") return "json";
+  // Chữ dài hoặc cột mô tả/ảnh/ghi chú → ô nhập nhiều dòng.
   const long = typeof sample === "string" && sample.length > 100;
   if (long || /image|description|details|content|avatar|note|user_agent/i.test(col.name)) return "longtext";
   return "text";
@@ -141,6 +148,7 @@ export function isImageValue(v: CellValue): v is string {
   return typeof v === "string" && (v.startsWith("/api/files/") || v.startsWith("data:image/") || /^https?:\/\/.+\.(png|jpe?g|webp|gif)(\?|$)/i.test(v));
 }
 
+// Mẫu nhận ra chuỗi ngày giờ dạng ISO (2026-01-05T08:30…).
 const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
 
 /** Chuỗi hiển thị đầy đủ (tooltip). */
@@ -152,11 +160,15 @@ export function rawText(v: CellValue): string {
 
 /** Giá trị hiển thị gọn trong ô bảng. */
 export function displayValue(name: string, v: CellValue, kind: ColumnKind): string {
+  // Trống → "—"; trạng thái → nhãn tiếng Việt; đúng/sai → Có/Không.
   if (v === null || v === undefined || v === "") return "—";
   if (name === "status" && typeof v === "string") return STATUS_LABEL[v] ?? v;
+  // Đổi theo kiểu ô: đúng/sai, JSON đẹp, giờ VN, ngày, chữ.
   if (kind === "boolean") return v === true || v === 1 || v === "1" || v === "true" ? "Có" : "Không";
+  // Ngày giờ → định dạng VN; dữ liệu nhị phân → ghi tóm tắt dung lượng.
   if (kind === "datetime" || (typeof v === "string" && ISO_RE.test(v) && kind !== "date")) return fmtDateTime(v as string, String(v));
   if (typeof v === "string" && v.startsWith("data:")) return `[dữ liệu ${v.slice(5, v.indexOf(";")) || "nhị phân"} · ${Math.round(v.length / 1024)} KB]`;
+  // Chữ quá dài thì cắt ở 180 ký tự.
   const s = rawText(v);
   return s.length > 180 ? `${s.slice(0, 180)}…` : s;
 }
@@ -173,31 +185,37 @@ export function toFormValue(v: CellValue, kind: ColumnKind): string | boolean {
 
 /** Chuỗi trong form → giá trị gửi lên server. Ném Error (tiếng Việt) nếu không hợp lệ. */
 export function fromFormValue(col: SuperColumn, kind: ColumnKind, v: string | boolean): CellValue {
+  // Tên cột để ghi vào câu báo lỗi.
   const label = labelOf(col.name);
   if (kind === "boolean") return Boolean(v);
   const s = String(v);
+  // Ô trống: cho phép rỗng → null; cột chữ → ""; còn lại báo lỗi.
   if (s.trim() === "") {
     if (!col.notnull) return null;
     if (kind === "text" || kind === "longtext") return "";
     throw new Error(`“${label}” không được để trống.`);
   }
   switch (kind) {
+    // Số: chấp nhận dấu phẩy thập phân.
     case "number": {
       const n = Number(s.trim().replace(",", "."));
       if (!Number.isFinite(n)) throw new Error(`“${label}” phải là số.`);
       return n;
     }
+    // JSON: phải đọc được.
     case "json":
       try {
         return JSON.parse(s) as CellValue;
       } catch {
         throw new Error(`“${label}” không phải JSON hợp lệ.`);
       }
+    // Ngày giờ: đổi giờ VN → giờ quốc tế.
     case "datetime": {
       const iso = fromVnInputValue(s);
       if (!iso) throw new Error(`“${label}” không phải thời gian hợp lệ.`);
       return iso;
     }
+    // Các kiểu khác: giữ nguyên chữ.
     default:
       return s;
   }

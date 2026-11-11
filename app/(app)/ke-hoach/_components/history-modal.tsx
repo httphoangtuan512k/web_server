@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: hộp "Lịch sử thao tác đơn hàng" (50 bản ghi gần nhất); Super Admin sửa/xóa được.
+ * Dùng ở: nút lịch sử trên trang Kế hoạch.
+ */
 
 import { History, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
@@ -13,6 +17,7 @@ import { useToast } from "@/components/ui/toast";
 import type { HistoryPatch, HistoryRow } from "./types";
 import { fromVnLocalInput, toVnLocalInput } from "./utils";
 
+// In giá trị cũ/mới: rỗng → "—", số → định dạng VN.
 const fmtVal = (v: unknown) => (v === null || v === undefined || v === "" ? "—" : fmtNumber(v, 3, String(v)));
 
 /**
@@ -20,6 +25,7 @@ const fmtVal = (v: unknown) => (v === null || v === undefined || v === "" ? "—
  * Super Admin: sửa (PATCH /api/history/:id) và xóa (DELETE /api/history/:id).
  */
 export function HistoryModal({ initialQuery, isSuper, onClose }: { initialQuery: string; isSuper: boolean; onClose: () => void }) {
+  // Thông báo, hộp xác nhận, danh sách bản ghi, lỗi, từ khóa lọc, bản ghi đang sửa, bản ghi đang xóa.
   const toast = useToast();
   const confirm = useConfirm();
   const [rows, setRows] = useState<HistoryRow[] | null>(null);
@@ -28,6 +34,7 @@ export function HistoryModal({ initialQuery, isSuper, onClose }: { initialQuery:
   const [editing, setEditing] = useState<HistoryRow | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
 
+  // Tải 50 bản ghi lịch sử từ máy chủ.
   const load = useCallback(async () => {
     try {
       const d = await api.get<HistoryRow[]>("/api/history");
@@ -38,11 +45,13 @@ export function HistoryModal({ initialQuery, isSuper, onClose }: { initialQuery:
     }
   }, []);
 
+  // Tải lần đầu khi mở hộp.
   useEffect(() => {
     const t = setTimeout(load, 0);
     return () => clearTimeout(t);
   }, [load]);
 
+  // Lọc theo từ khóa (số đơn, người, hành động, máy).
   const shown = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!rows || !s) return rows ?? [];
@@ -55,6 +64,7 @@ export function HistoryModal({ initialQuery, isSuper, onClose }: { initialQuery:
     );
   }, [rows, q]);
 
+  /** Xóa 1 bản ghi: hỏi xác nhận (nút đỏ) → gọi API → tải lại. */
   async function remove(r: HistoryRow) {
     const ok = await confirm({
       title: "Xóa bản ghi lịch sử?",
@@ -76,7 +86,9 @@ export function HistoryModal({ initialQuery, isSuper, onClose }: { initialQuery:
   }
 
   return (
+    // Hộp lịch sử + (nếu đang sửa) hộp sửa bản ghi.
     <>
+      {/* Hộp lớn: tiêu đề có icon; chân hộp nút "Tải lại" + "Đóng". */}
       <Modal
         open
         onClose={onClose}
@@ -98,7 +110,9 @@ export function HistoryModal({ initialQuery, isSuper, onClose }: { initialQuery:
           </>
         }
       >
+        {/* Ô lọc nhanh. */}
         <SearchInput value={q} onChange={(e) => setQ(e.target.value)} placeholder="Lọc theo số đơn, người thao tác, hành động, máy…" className="mb-3" />
+        {/* Lỗi → chữ đỏ; đang tải → khối xám; không có → thông báo rỗng; có → bảng. */}
         {error ? (
           <p className="py-6 text-center text-sm text-danger-600">Không thể tải lịch sử: {error}</p>
         ) : !rows ? (
@@ -112,6 +126,7 @@ export function HistoryModal({ initialQuery, isSuper, onClose }: { initialQuery:
         ) : (
           <div className="overflow-hidden rounded-xl border border-line">
             <Table maxHeight="60dvh">
+              {/* Hàng tiêu đề; cột "Sửa / Xóa" chỉ cho Super Admin. */}
               <THead>
                 <tr>
                   <Th>Thời gian</Th>
@@ -126,6 +141,7 @@ export function HistoryModal({ initialQuery, isSuper, onClose }: { initialQuery:
               </THead>
               <tbody>
                 {shown.map((r) => (
+                  // Mỗi bản ghi một dòng.
                   <Tr key={r.id}>
                     <Td className="num whitespace-nowrap text-muted">{fmtDateTime(r.created_at)}</Td>
                     <Td className="font-medium">{r.order_number}</Td>
@@ -134,6 +150,7 @@ export function HistoryModal({ initialQuery, isSuper, onClose }: { initialQuery:
                     <Td>{r.action}</Td>
                     <Td align="right">{fmtVal(r.old_value)}</Td>
                     <Td align="right">{fmtVal(r.new_value)}</Td>
+                    {/* Super Admin: nút ✎ sửa và nút 🗑 xóa (đỏ). */}
                     {isSuper ? (
                       <Td align="right">
                         <div className="flex justify-end gap-1">
@@ -158,6 +175,7 @@ export function HistoryModal({ initialQuery, isSuper, onClose }: { initialQuery:
           </div>
         )}
       </Modal>
+      {/* Hộp sửa bản ghi (khi bấm ✎). */}
       {editing ? (
         <HistoryEditModal
           row={editing}
@@ -172,10 +190,12 @@ export function HistoryModal({ initialQuery, isSuper, onClose }: { initialQuery:
   );
 }
 
+/** Hộp sửa 1 bản ghi lịch sử (chỉ Super Admin). */
 function HistoryEditModal({ row, onClose, onSaved }: { row: HistoryRow; onClose: () => void; onSaved: () => Promise<void> }) {
   const toast = useToast();
   const formId = useId();
   const [saving, setSaving] = useState(false);
+  // Giá trị form, điền sẵn từ bản ghi.
   const [v, setV] = useState({
     order_number: row.order_number ?? "",
     machine_name: row.machine_name ?? "",
@@ -185,8 +205,10 @@ function HistoryEditModal({ row, onClose, onSaved }: { row: HistoryRow; onClose:
     new_value: row.new_value === null || row.new_value === undefined ? "" : String(row.new_value),
     created_at: toVnLocalInput(row.created_at),
   });
+  // Cập nhật 1 ô khi gõ.
   const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement>) => setV((s) => ({ ...s, [k]: e.target.value }));
 
+  /** Bấm "Lưu": kiểm tra ô bắt buộc, đổi số, gửi PATCH, báo kết quả. */
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const createdAt = fromVnLocalInput(v.created_at);
@@ -216,6 +238,7 @@ function HistoryEditModal({ row, onClose, onSaved }: { row: HistoryRow; onClose:
   }
 
   return (
+    // Hộp vừa: chân hộp "Hủy" + "Lưu".
     <Modal
       open
       onClose={onClose}
@@ -233,6 +256,7 @@ function HistoryEditModal({ row, onClose, onSaved }: { row: HistoryRow; onClose:
         </>
       }
     >
+      {/* Lưới 2 cột các ô: số đơn, thời gian, người, máy, hành động, giá trị cũ/mới. */}
       <form id={formId} onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
         <Field label="Số đơn" required>
           <Input value={v.order_number} onChange={set("order_number")} required />

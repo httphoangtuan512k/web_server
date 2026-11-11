@@ -1,3 +1,4 @@
+// File này: đồng bộ dữ liệu từ server cũ (SQLite) sang Postgres + Vercel Blob. Dùng ở: npm run db:import.
 import './load-env';
 /**
  * Đồng bộ dữ liệu từ server cũ (SQLite web/data/superwhite.db) sang Neon Postgres (schema mới) + Vercel Blob.
@@ -20,16 +21,21 @@ import { Pool, PoolClient } from 'pg';
 import { BlobService } from '../src/blob/blob.service';
 import { getPool } from '../src/db/db.service';
 
+// R = một dòng dữ liệu bất kỳ (tên cột → giá trị).
 type R = Record<string, any>;
+// Tham số dòng lệnh; flag('--x') lấy giá trị đứng sau cờ --x.
 const args = process.argv.slice(2);
 const flag = (name: string) => {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : undefined;
 };
+// File SQLite = tham số đầu tiên không phải cờ (và không phải giá trị của --excel-*).
 const sqlitePath = args.find((a, i) => !a.startsWith('--') && !(i > 0 && args[i - 1].startsWith('--excel')));
+// Có --wipe thì xóa sạch rồi import lại.
 const WIPE = args.includes('--wipe');
 
 // ------------------------------------------------------------------ chuẩn hóa giá trị
+/** Chuỗi ngày giờ cũ → Date (rỗng/sai → null). */
 const ts = (v: unknown): Date | null => {
   if (v === null || v === undefined || v === '') return null;
   const s = String(v);
@@ -37,11 +43,13 @@ const ts = (v: unknown): Date | null => {
   const d = new Date(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(s) ? s.replace(' ', 'T') + 'Z' : s);
   return Number.isNaN(d.getTime()) ? null : d;
 };
+// Chuẩn hóa: ngày (mặc định bây giờ), 0/1 → boolean, số, chuỗi, rỗng → null.
 const tsNow = (v: unknown) => ts(v) ?? new Date();
 const bool = (v: unknown) => v === 1 || v === '1' || v === true;
 const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const str = (v: unknown) => (v === null || v === undefined ? '' : String(v));
 const nullIfEmpty = (v: unknown) => (v === null || v === undefined || v === '' ? null : v);
+/** Đọc chuỗi JSON; rỗng thì dùng fallback, hỏng thì gói vào { raw }. */
 const jsonOr = (v: unknown, fallback: unknown) => {
   if (v === null || v === undefined || v === '') return fallback;
   try {
@@ -50,6 +58,7 @@ const jsonOr = (v: unknown, fallback: unknown) => {
     return { raw: String(v) };
   }
 };
+/** Chuỗi JSON → mảng chữ (vd danh sách quyền). */
 const strArray = (v: unknown): string[] => {
   const x = jsonOr(v, []);
   return Array.isArray(x) ? x.map(String) : [];
@@ -60,38 +69,51 @@ const strArray = (v: unknown): string[] => {
 class Json {
   constructor(readonly v: unknown) {}
 }
+// Bọc giá trị thành Json (null giữ nguyên).
 const J = (v: unknown) => (v === null || v === undefined ? null : new Json(v));
+/** INSERT một dòng; mặc định bỏ qua nếu đã có (chạy lại không trùng). Trả về dòng vừa thêm. */
 async function insert(c: PoolClient, table: string, row: R, conflict = 'ON CONFLICT DO NOTHING') {
+  // Cột = khóa của object; giá trị Json đổi thành chuỗi JSON.
   const cols = Object.keys(row);
   const values = cols.map((k) => (row[k] instanceof Json ? JSON.stringify(row[k].v) : row[k]));
+  // Ghép câu INSERT với $1, $2… cho từng cột.
   const sql = `INSERT INTO "${table}" (${cols.map((c2) => `"${c2}"`).join(',')}) VALUES (${cols
     .map((_, i) => `$${i + 1}`)
     .join(',')}) ${conflict} RETURNING *`;
   return (await c.query(sql, values)).rows[0];
 }
+/** Đặt bộ đếm id tự tăng = id lớn nhất hiện có (vì đã chèn id cũ thủ công). */
 async function resetIdentity(c: PoolClient, table: string, col = 'id') {
   await c.query(
     `SELECT setval(pg_get_serial_sequence('"${table}"','${col}'), GREATEST((SELECT COALESCE(MAX("${col}"),0) FROM "${table}"),1), (SELECT COUNT(*)>0 FROM "${table}"))`,
   );
 }
+/** Đếm số dòng trong bảng (để đối chiếu). */
 const count = async (c: PoolClient, table: string, where = '') =>
   (await c.query(`SELECT COUNT(*)::int AS n FROM "${table}" ${where}`)).rows[0].n as number;
 
 // ------------------------------------------------------------------ main
+/** Đọc SQLite cũ, chèn lần lượt từng nhóm bảng vào Postgres trong 1 transaction. */
 async function main() {
+  // Mở file SQLite cũ (chỉ đọc).
   if (!sqlitePath || !existsSync(sqlitePath)) throw new Error('Cần đường dẫn tới superwhite.db');
   const lite = new Database(sqlitePath, { readonly: true, fileMustExist: true });
+  // Danh sách bảng có trong SQLite; all() đọc cả bảng (không có bảng → rỗng).
   const has = new Set((lite.prepare("SELECT name FROM sqlite_master WHERE type='table'").all() as R[]).map((r) => r.name));
   const all = (table: string, order = 'rowid'): R[] => (has.has(table) ? (lite.prepare(`SELECT * FROM "${table}" ORDER BY ${order}`).all() as R[]) : []);
+  // Kết nối Blob, Postgres; mượn 1 kết nối riêng cho transaction.
   const blob = new BlobService();
   const pool = getPool();
   const c = await pool.connect();
+  // Báo cáo: số dòng nguồn (SQLite) so với đích (Postgres).
   const report: R[] = [];
   const done = async (source: string, src: number, target: string, where = '') =>
     report.push({ source, sqlite: src, target, postgres: await count(c, target, where) });
 
   try {
+    // Bắt đầu transaction: lỗi giữa chừng thì hủy toàn bộ.
     await c.query('BEGIN');
+    // --wipe: làm rỗng mọi bảng nghiệp vụ, đặt lại bộ đếm id.
     if (WIPE) {
       await c.query(`TRUNCATE users, user_sessions, orders, order_history, order_events, audit_logs, maintenance_records,
         warehouse_items, warehouse_transactions, warehouse_daily_entries, warehouse_daily_entry_lines, warehouse_daily_closings,
@@ -101,10 +123,12 @@ async function main() {
     }
 
     // users (+ order_status_permissions gộp vào users.order_permissions)
+    // Gom quyền đơn hàng theo user (user_id → danh sách quyền).
     const orderPerms = new Map<number, string[]>();
     for (const p of all('order_status_permissions')) {
       orderPerms.set(p.user_id, [...(orderPerms.get(p.user_id) || []), String(p.status)]);
     }
+    // Chèn từng user; avatar base64 được chuyển lên Blob.
     const users = all('users', 'id');
     let avatars = 0;
     for (const u of users) {
@@ -125,8 +149,10 @@ async function main() {
         updated_at: tsNow(u.created_at),
       });
     }
+    // Đặt lại bộ đếm id và ghi báo cáo.
     await resetIdentity(c, 'users');
     await done(`users (+${orderPerms.size} quyền đơn, ${avatars} avatar)`, users.length, 'users');
+    // userRef: id user còn tồn tại thì giữ, không thì null.
     const userIds = new Set(users.map((u) => u.id));
     const userRef = (v: unknown) => (userIds.has(Number(v)) ? Number(v) : null);
 
@@ -153,8 +179,10 @@ async function main() {
 
     // orders: chèn đơn gốc trước, đơn con sau (khóa ngoại parent_order_id)
     const orders = all('orders', 'created_at');
+    // Sắp xếp: đơn gốc (không có parent) lên trước.
     const orderIds = new Set(orders.map((o) => o.id));
     orders.sort((a, b) => Number(!!nullIfEmpty(a.parent_order_id) && a.parent_order_id !== a.id) - Number(!!nullIfEmpty(b.parent_order_id) && b.parent_order_id !== b.id));
+    // Chèn từng đơn; ảnh base64 → Blob; parent không hợp lệ → null.
     let orderImages = 0;
     for (const o of orders) {
       const img = str(o.image_data).startsWith('data:') ? (orderImages++, await blob.persistImage(o.image_data, 'orders')) : str(o.image_data);
@@ -231,6 +259,7 @@ async function main() {
     const maint = all('maintenance_records', 'id');
     let maintImages = 0;
     for (const m of maint) {
+      // Ảnh base64 → Blob, đếm số ảnh đã chuyển.
       const img = async (v: unknown) => (str(v).startsWith('data:') ? (maintImages++, await blob.persistImage(v, 'maintenance')) : str(v));
       await insert(c, 'maintenance_records', {
         id: m.id, equipment: str(m.equipment), fault_description: str(m.fault_description), fault_image_url: await img(m.fault_image),
@@ -243,12 +272,14 @@ async function main() {
 
     // warehouse_items (gộp 3 bảng) + transactions
     const itemMap = new Map<string, number>(); // `${category}:${oldId}` -> id mới
+    // 3 bảng cũ → category mới + cột riêng từng loại (đơn vị mặc định).
     const sources: Array<[string, string, (r: R) => R]> = [
       ['warehouse_goods', 'goods', (r) => ({ code: str(r.code), grain_size: str(r.grain_size), unit: str(r.unit) || 'tấn' })],
       ['warehouse_packaging', 'packaging', (r) => ({ lot_number: str(r.lot_number), unit: str(r.unit) || 'bao' })],
       ['warehouse_materials', 'materials', (r) => ({ shelf_number: str(r.shelf_number), unit: str(r.unit) || 'cái' })],
     ];
     let itemCount = 0;
+    // Tìm mặt hàng đã có (khi chạy lại); chưa có thì chèn; nhớ id cũ → id mới.
     for (const [table, category, extra] of sources) {
       for (const r of all(table, 'id')) {
         itemCount++;
@@ -266,6 +297,7 @@ async function main() {
     }
     await done('warehouse_goods/packaging/materials', itemCount, 'warehouse_items');
 
+    // Giao dịch kho: đổi item_id cũ sang id mới.
     const txs = all('warehouse_transactions', 'id');
     for (const t of txs) {
       await insert(c, 'warehouse_transactions', {
@@ -334,6 +366,7 @@ async function main() {
     let legacy = 0;
     for (const t of ['warehouse_production_entries', 'warehouse_production_reports', 'warehouse_production_report_lines']) {
       for (const r of all(t)) {
+        // Chỉ thêm nếu chưa lưu dòng này.
         const exists = await c.query(`SELECT 1 FROM legacy_records WHERE source_table=$1 AND data->>'id'=$2`, [t, String(r.id)]);
         if (!exists.rowCount) await insert(c, 'legacy_records', { source_table: t, data: J(r) });
         legacy++;
@@ -343,10 +376,12 @@ async function main() {
 
     // PLC
     const DEVICE = 'MAY_B';
+    // Lấy API key và bản tin mới nhất của máy B từ SQLite.
     const key = has.has('plc_api_keys') ? (lite.prepare('SELECT * FROM plc_api_keys WHERE device_id=?').get(DEVICE) as R | undefined) : undefined;
     const last = has.has('plc_telemetry_history')
       ? (lite.prepare('SELECT * FROM plc_telemetry_history WHERE device_id=? ORDER BY id DESC LIMIT 1').get(DEVICE) as R | undefined)
       : undefined;
+    // Thêm/cập nhật thiết bị PLC, giữ bản tin và mốc thời gian mới hơn.
     await insert(
       c,
       'plc_devices',
@@ -366,12 +401,14 @@ async function main() {
         last_received_at=GREATEST(EXCLUDED.last_received_at, plc_devices.last_received_at),
         last_history_at=GREATEST(EXCLUDED.last_history_at, plc_devices.last_history_at)`,
     );
+    // Trạng thái tính toán từng máy.
     const states = all('plc_operation_state');
     for (const s of states) {
       await insert(c, 'plc_machine_states', { machine_id: s.machine_id, device_id: DEVICE, state: J(jsonOr(s.state_json, {})), updated_at: tsNow(s.updated_at) });
     }
     await done('plc_operation_state', states.length, 'plc_machine_states');
 
+    // Lịch sử bản tin PLC.
     const history = all('plc_telemetry_history', 'id');
     for (const h of history) {
       await insert(c, 'plc_telemetry_history', {
@@ -381,16 +418,21 @@ async function main() {
     await resetIdentity(c, 'plc_telemetry_history');
     await done('plc_telemetry_history', history.length, 'plc_telemetry_history');
 
+    // Mọi thứ OK → lưu chính thức.
     await c.query('COMMIT');
   } catch (e) {
+    // Lỗi → hủy toàn bộ thay đổi.
     await c.query('ROLLBACK');
     throw e;
   } finally {
+    // Luôn trả kết nối về hồ.
     c.release();
   }
 
+  // Import tài liệu Excel (ngoài transaction), rồi in báo cáo.
   await importDocuments(blob, pool, report);
   console.table(report);
+  // Cảnh báo bảng nào ở Postgres ít dòng hơn SQLite.
   const bad = report.filter((r) => r.postgres < r.sqlite && !String(r.source).includes('goods/packaging'));
   console.log(bad.length ? `⚠ Kiểm tra lại: ${bad.map((b) => b.target).join(', ')}` : '✅ Import hoàn tất, số dòng khớp.');
   await pool.end();
@@ -398,14 +440,17 @@ async function main() {
 
 /** Kho tài liệu Excel: file trên đĩa (+ metadata từ Postgres cũ nếu có) -> Blob + bảng documents. */
 async function importDocuments(blob: BlobService, pool: Pool, report: R[]) {
+  // Không có --excel-dir thì bỏ qua.
   const dir = flag('--excel-dir');
   if (!dir || !existsSync(dir)) return;
+  // Đuôi file → loại MIME Excel.
   const mimeByExt: Record<string, string> = {
     '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     '.xlsm': 'application/vnd.ms-excel.sheet.macroEnabled.12',
     '.xls': 'application/vnd.ms-excel',
     '.xlsb': 'application/vnd.ms-excel.sheet.binary.macroEnabled.12',
   };
+  // Có --excel-db: đọc metadata và quyền tài liệu từ Postgres cũ.
   const oldMeta = new Map<string, R>();
   const oldPerms: R[] = [];
   const oldUrl = flag('--excel-db');
@@ -415,13 +460,18 @@ async function importDocuments(blob: BlobService, pool: Pool, report: R[]) {
     oldPerms.push(...(await old.query('SELECT * FROM excel_permissions')).rows);
     await old.end();
   }
+  // Chủ sở hữu mặc định = Super Admin đầu tiên.
   const owner = (await pool.query(`SELECT id, COALESCE(NULLIF(full_name,''),username) AS name FROM users WHERE is_super ORDER BY id LIMIT 1`)).rows[0];
+  // Chỉ lấy file Excel trong thư mục.
   const files = readdirSync(dir).filter((n) => mimeByExt[extname(n).toLowerCase()]);
   for (const name of files) {
     const ext = extname(name).toLowerCase();
     const meta = oldMeta.get(name);
+    // id tài liệu: từ metadata cũ, hoặc UUID đầu tên file, hoặc tạo mới.
     const id = meta?.id || /^[0-9a-f-]{36}/i.exec(name)?.[0] || randomUUID();
+    // Đã import rồi thì bỏ qua.
     if ((await pool.query('SELECT 1 FROM documents WHERE id=$1', [id])).rowCount) continue;
+    // Đọc file, tải lên Blob rồi ghi dòng documents.
     const buf = readFileSync(join(dir, name));
     const saved = await blob.put(`documents/${id}${ext}`, buf, mimeByExt[ext], { random: false });
     await pool.query(
@@ -431,6 +481,7 @@ async function importDocuments(blob: BlobService, pool: Pool, report: R[]) {
         meta?.owner_user_id ?? owner?.id ?? null, meta?.owner_name ?? owner?.name ?? '', meta?.created_at ?? null, meta?.updated_at ?? null],
     );
   }
+  // Chép quyền tài liệu (chỉ khi tài liệu và user đều tồn tại).
   for (const p of oldPerms) {
     await pool.query(
       `INSERT INTO document_permissions(document_id,user_id,permission,granted_by,granted_at) SELECT $1,$2,$3,$4,$5
@@ -438,9 +489,11 @@ async function importDocuments(blob: BlobService, pool: Pool, report: R[]) {
       [p.file_id, p.user_id, p.permission, p.granted_by, p.granted_at],
     );
   }
+  // Ghi kết quả vào báo cáo.
   report.push({ source: 'data/excel/files', sqlite: files.length, target: 'documents', postgres: (await pool.query('SELECT COUNT(*)::int n FROM documents')).rows[0].n });
 }
 
+// Chạy; lỗi thì in ra và thoát mã 1.
 main().catch((e) => {
   console.error('Import lỗi:', e);
   process.exit(1);

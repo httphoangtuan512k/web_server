@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: hộp "Chi tiết" của một đơn – ảnh, số liệu sản xuất, các nhóm thông tin, lịch sử vận hành.
+ * Dùng ở: trang Kế hoạch, khi bấm vào dòng đơn hoặc nút "👁 Xem".
+ */
 
 import { Activity, ClipboardList, Cog, FlaskConical, History, ImageOff, Maximize2, ShieldCheck } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
@@ -13,8 +17,10 @@ import { BTN_BASE, BTN_SECONDARY, ProductionProgress, StatusBadge } from "./orde
 import type { EditableOrderField, OrderGroup, OrderPerms } from "./types";
 import { dateKey, fmtTons, remainingOf, toNum } from "./utils";
 
+// Các trường kiểu số (khi lưu phải đổi sang số).
 const NUMERIC: EditableOrderField[] = ["quantity", "runOnMachine", "actualProduced", "khoBu"];
 
+/** Một nhóm thông tin: tiêu đề in hoa có icon (+ phần phụ bên phải) và nội dung. */
 function Section({ icon: Icon, title, aside, children }: { icon: typeof Cog; title: string; aside?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section className="space-y-2.5">
@@ -30,6 +36,7 @@ function Section({ icon: Icon, title, aside, children }: { icon: typeof Cog; tit
   );
 }
 
+// Giá trị rỗng → dấu "—" màu nhạt.
 const dash = (v: unknown) => (v === null || v === undefined || String(v).trim() === "" ? <span className="text-subtle">—</span> : String(v));
 
 /**
@@ -57,10 +64,12 @@ export function OrderDetailModal({
   onOpenHistory: (orderNumber: string) => void;
   onReload: () => Promise<void>;
 }) {
+  // Dòng đại diện của nhóm (để sửa) và cờ Super Admin.
   const toast = useToast();
   const rep = group.rows[0] ?? group;
   const su = perms.isSuper;
 
+  /** Lưu 1 trường do Super Admin sửa: kiểm tra, đổi số, gửi PATCH, tải lại, báo kết quả. */
   async function save(field: EditableOrderField, raw: string): Promise<boolean> {
     let value: string | number = raw;
     if (field === "createdAt" && !raw) {
@@ -86,7 +95,7 @@ export function OrderDetailModal({
     }
   }
 
-  /** Ô thông tin; Super Admin sửa được. */
+  /** Vẽ 1 ô thông tin (DetailField); Super Admin sửa được. */
   const F = (
     field: EditableOrderField,
     label: string,
@@ -109,10 +118,12 @@ export function OrderDetailModal({
     );
   };
 
+  // Số tấn còn lại; đơn có nhiều máy chạy hay không.
   const remaining = remainingOf(group);
   const multi = group.rows.length > 1;
 
   return (
+    // Hộp rất lớn: tiêu đề "Chi tiết: số đơn - mã hàng" + nhãn trạng thái; chân hộp: nút thao tác, "Nhật ký thao tác", "Đóng".
     <Modal
       open
       onClose={onClose}
@@ -138,8 +149,9 @@ export function OrderDetailModal({
       }
     >
       <div className="space-y-6">
-        {/* Ảnh + tóm tắt sản xuất */}
+        {/* Hàng trên: ảnh bên trái + tóm tắt sản xuất bên phải. */}
         <div className="grid gap-4 md:grid-cols-[220px_1fr]">
+          {/* Có ảnh: ảnh bao bì (bấm để xem lớn); không có: khung "Không có ảnh". */}
           {group.imageData ? (
             <button
               type="button"
@@ -160,6 +172,7 @@ export function OrderDetailModal({
               </span>
             </div>
           )}
+          {/* Ô tóm tắt: 4 số liệu, thanh tiến độ, máy, người chạy, ngày xong, người xác nhận. */}
           <div className="rounded-xl border border-line bg-surface-2 p-4">
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
               <Metric label="Số lượng đặt" value={fmtTons(group.quantity)} unit="tấn" />
@@ -185,6 +198,7 @@ export function OrderDetailModal({
           </div>
         </div>
 
+        {/* Dòng nhắc nền vàng cho Super Admin. */}
         {su ? (
           <p className="rounded-lg border border-warning-600/25 bg-warning-50 px-3 py-2 text-[13px] text-warning-700">
             Chế độ Super Admin: bấm biểu tượng bút chì để sửa trực tiếp dữ liệu gốc
@@ -192,6 +206,7 @@ export function OrderDetailModal({
           </p>
         ) : null}
 
+        {/* Nhóm "Thông tin đơn hàng". */}
         <Section icon={ClipboardList} title="Thông tin đơn hàng">
           <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             {F("orderNumber", "Số đơn hàng", dash(rep.orderNumber))}
@@ -203,6 +218,7 @@ export function OrderDetailModal({
           </div>
         </Section>
 
+        {/* Nhóm "Quy cách sản phẩm". */}
         <Section icon={FlaskConical} title="Quy cách sản phẩm">
           <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             {F("whiteness", "Độ trắng", dash(rep.whiteness))}
@@ -220,6 +236,7 @@ export function OrderDetailModal({
           </div>
         </Section>
 
+        {/* Nhóm "Sản xuất & ký nhận" (sản lượng thực tế chỉ Super Admin thấy). */}
         <Section icon={ShieldCheck} title="Sản xuất & ký nhận">
           <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             {F("runOnMachine", "Đã chạy máy", <span className="num">{fmtTons(rep.runOnMachine)}</span>, { type: "number" })}
@@ -232,10 +249,12 @@ export function OrderDetailModal({
           <p className="text-xs text-muted">Sản lượng thực tế được nhập và điều chỉnh tại trang Kho.</p>
         </Section>
 
+        {/* Danh sách các máy chạy đơn (khi có nhiều máy). */}
         {multi ? (
           <Section icon={Cog} title={`Các máy chạy đơn (${group.rows.length})`}>
             <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
               {group.rows.map((r) => (
+                // Mỗi máy một dòng: tên máy, trạng thái, người chạy, sản lượng, giờ tạo.
                 <div key={r.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 bg-surface px-3 py-2.5 text-[13px]">
                   <span className="min-w-24 font-medium text-fg">{r.machineName || "Chưa rõ máy"}</span>
                   <StatusBadge order={r} />
@@ -248,6 +267,7 @@ export function OrderDetailModal({
           </Section>
         ) : null}
 
+        {/* Dòng thời gian lịch sử vận hành. */}
         <Section icon={Activity} title="Lịch sử vận hành và xác nhận">
           <OperationTimeline order={rep} version={version} />
         </Section>
@@ -256,6 +276,7 @@ export function OrderDetailModal({
   );
 }
 
+/** Ô số liệu nhỏ: nhãn + số lớn + đơn vị. */
 function Metric({ label, value, unit }: { label: string; value: string; unit?: string }) {
   return (
     <div className="min-w-0">

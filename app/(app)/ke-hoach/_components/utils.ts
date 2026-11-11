@@ -1,6 +1,11 @@
+/**
+ * File này: hàm phụ trợ cho trang Kế hoạch – đổi số, ngày, gộp/sắp xếp đơn, trạng thái.
+ * Dùng ở: các component trong ke-hoach/_components.
+ */
 import { fmtNumber, todayKey } from "@/lib/format";
 import type { Order, OrderGroup, StatusFilter } from "./types";
 
+/** Đổi giá trị sang số; không hợp lệ → 0. */
 export const toNum = (v: unknown) => {
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? n : 0;
@@ -9,6 +14,7 @@ export const toNum = (v: unknown) => {
 /** Số tấn: tối đa 3 chữ số thập phân. */
 export const fmtTons = (v: unknown) => fmtNumber(toNum(v), 3, "0");
 
+// Đổi chuỗi ngày sang mili-giây; không có → 0.
 const time = (v: string | null | undefined) => {
   const t = v ? new Date(v).getTime() : NaN;
   return Number.isNaN(t) ? 0 : t;
@@ -25,6 +31,7 @@ export function dateKey(v: string | null | undefined) {
 /** 'YYYY-MM' theo giờ VN – bộ lọc tháng/năm. */
 export const monthKey = (v: string | null | undefined) => dateKey(v).slice(0, 7);
 
+/** Mã nhóm: đơn chạy thêm máy dùng mã đơn gốc. */
 export const groupKeyOf = (o: Order) => o.parentOrderId || o.id;
 
 /**
@@ -34,6 +41,7 @@ export const groupKeyOf = (o: Order) => o.parentOrderId || o.id;
  * Đầu vào sắp xếp mới nhất trước (như server trả), dòng đầu tiên của nhóm làm đại diện.
  */
 export function groupOrders(list: Order[]): OrderGroup[] {
+  // Mỗi nhóm có 1 mã; dòng đầu tạo nhóm, các dòng sau cộng dồn vào.
   const map = new Map<string, OrderGroup>();
   for (const o of list) {
     const key = groupKeyOf(o);
@@ -71,6 +79,7 @@ const priority = (g: OrderGroup) => {
   if (g.status === "completed") return 3;
   return 4;
 };
+/** Sắp xếp nhóm đơn theo thứ tự ưu tiên ở trên. */
 export function sortGroups(list: OrderGroup[]) {
   return [...list].sort((a, b) => priority(a) - priority(b) || time(b.createdAt) - time(a.createdAt));
 }
@@ -80,15 +89,19 @@ export function isArchived(o: Pick<Order, "status" | "completedAt" | "updatedAt"
   if (o.status !== "completed") return false;
   const t = time(o.completedAt || o.updatedAt);
   if (!t) return false;
+  // Mốc: lùi 3 tháng so với `now`.
   const cutoff = new Date(now);
   cutoff.setMonth(cutoff.getMonth() - 3);
   return t <= cutoff.getTime();
 }
 
+// Mã trạng thái hiển thị: new / running / paused / completed.
 export type StatusKey = Exclude<StatusFilter, "all">;
+/** Tính trạng thái hiển thị của đơn (đang chạy mà tạm dừng → paused). */
 export const statusKey = (o: Pick<Order, "status" | "isPaused">): StatusKey =>
   o.status === "running" ? (o.isPaused ? "paused" : "running") : o.status === "completed" ? "completed" : "new";
 
+// Chữ và màu nhãn cho từng trạng thái.
 export const STATUS_META: Record<StatusKey, { label: string; tone: "info" | "warning" | "neutral" | "success" }> = {
   new: { label: "Chưa chạy", tone: "neutral" },
   running: { label: "Đang chạy", tone: "warning" },
@@ -96,12 +109,14 @@ export const STATUS_META: Record<StatusKey, { label: string; tone: "info" | "war
   completed: { label: "Hoàn thành", tone: "success" },
 };
 
+/** Số tấn còn lại = số lượng đặt − đã sản xuất (không âm). */
 export const remainingOf = (g: Pick<Order, "quantity" | "actualProduced">) => Math.max(0, toNum(g.quantity) - toNum(g.actualProduced));
 
 /** ISO → 'YYYY-MM-DDTHH:mm' theo giờ VN (cho input datetime-local). */
 export function toVnLocalInput(v: string | null | undefined) {
   const d = v ? new Date(v) : null;
   if (!d || Number.isNaN(d.getTime())) return "";
+  // Tách ngày giờ theo giờ VN thành từng phần rồi ghép lại.
   const p = Object.fromEntries(
     new Intl.DateTimeFormat("en-GB", {
       timeZone: "Asia/Ho_Chi_Minh",

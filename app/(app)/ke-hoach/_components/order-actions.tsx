@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: nút thao tác trên đơn (👁 Xem, ▶ Chạy, ⏸ Tạm dừng, ✔ Xác nhận xong, Sửa, Xóa) và logic gọi API của chúng.
+ * Dùng ở: danh sách đơn và hộp chi tiết đơn trên trang Kế hoạch.
+ */
 
 import { useCallback, useState } from "react";
 import { api, errorMessage } from "@/lib/api";
@@ -10,6 +14,7 @@ import { SmallButton } from "./order-bits";
 import type { OrderGroup, OrderPerms } from "./types";
 import { fmtTons, toNum } from "./utils";
 
+// Các loại thao tác trên một đơn.
 export type OrderActionKind = "view" | "edit" | "start" | "resume" | "pause" | "addMachine" | "complete" | "delete";
 
 /** Chữ + màu nền đúng như nút `.small` trang cũ (kehoach.html). */
@@ -26,12 +31,14 @@ const DEFS: Record<OrderActionKind, { text: string; title: string; bg: string; d
 
 /** Các thao tác hợp lệ cho một đơn theo trạng thái + quyền (giống trang cũ, đúng thứ tự nút). */
 export function availableActions(g: OrderGroup, perms: OrderPerms): OrderActionKind[] {
+  // Chưa chạy → ▶ Chạy; đang chạy → ▶ Chạy tiếp (nếu tạm dừng) hoặc ⏸ Tạm dừng + ▶ Chạy thêm máy.
   const out: OrderActionKind[] = [];
   if (g.status === "new" && perms.operate) out.push("start");
   else if (g.status === "running" && perms.operate) {
     if (g.isPaused) out.push("resume");
     else out.push("pause", "addMachine");
   }
+  // Đang chạy + quyền xác nhận → ✔ Xác nhận xong; rồi Sửa, Xóa nếu có quyền.
   if (g.status === "running" && perms.confirm) out.push("complete");
   if (perms.edit) out.push("edit");
   if (perms.remove) out.push("delete");
@@ -54,14 +61,17 @@ export function OrderActionButtons({
   withView?: boolean;
   className?: string;
 }) {
+  // Danh sách nút; thêm "👁 Xem" đầu tiên nếu cần; không có nút nào thì không vẽ.
   const kinds = availableActions(group, perms);
   if (withView) kinds.unshift("view");
   if (!kinds.length) return null;
   return (
+    // Hàng nút; bấm nút không làm mở chi tiết dòng.
     <div className={cn("flex flex-wrap items-center gap-1", className)} onClick={(e) => e.stopPropagation()}>
       {kinds.map((k) => {
         const d = DEFS[k];
         return (
+          // Mỗi nút đúng chữ & màu bản gốc; xoay tròn khi đang xử lý.
           <SmallButton
             key={k}
             bg={d.bg}
@@ -83,11 +93,13 @@ export function OrderActionButtons({
  * Trả về `perform` + `dialog` (đặt dialog vào cây JSX).
  */
 export function useOrderOperations({ reload, machineSuggestions }: { reload: () => Promise<void>; machineSuggestions: string[] }) {
+  // Hộp xác nhận, thông báo, nút đang xử lý, hộp hỏi tên máy đang mở.
   const confirm = useConfirm();
   const toast = useToast();
   const [pending, setPending] = useState<string | null>(null);
   const [machine, setMachine] = useState<{ kind: MachineDialogKind; group: OrderGroup } | null>(null);
 
+  // Chạy 1 lệnh API: báo đang xử lý → gọi → tải lại danh sách → báo thành công/lỗi.
   const exec = useCallback(
     async (key: string, call: () => Promise<unknown>, success: string) => {
       setPending(key);
@@ -111,11 +123,13 @@ export function useOrderOperations({ reload, machineSuggestions }: { reload: () 
     async (kind: OrderActionKind, g: OrderGroup): Promise<boolean> => {
       const key = `${kind}:${g.id}`;
       switch (kind) {
+        // Chạy / Chạy tiếp / Chạy thêm máy: mở hộp hỏi tên máy.
         case "start":
         case "resume":
         case "addMachine":
           setMachine({ kind, group: g });
           return false;
+        // ⏸ Tạm dừng: hỏi xác nhận rồi gọi API.
         case "pause": {
           const ok = await confirm({
             title: "Tạm dừng đơn hàng này?",
@@ -125,6 +139,7 @@ export function useOrderOperations({ reload, machineSuggestions }: { reload: () 
           if (!ok) return false;
           return exec(key, () => api.post(`/api/orders/${g.id}/operations/pause`, {}), "Đã tạm dừng đơn hàng.");
         }
+        // ✔ Xác nhận xong: hỏi xác nhận (hiện sản lượng hiện tại) rồi gọi API.
         case "complete": {
           const qty = toNum(g.quantity);
           const produced = toNum(g.actualProduced);
@@ -147,6 +162,7 @@ export function useOrderOperations({ reload, machineSuggestions }: { reload: () 
           if (!ok) return false;
           return exec(key, () => api.put(`/api/orders/${g.id}/operations/complete`, {}), "Đã xác nhận hoàn thành.");
         }
+        // Xóa: hỏi xác nhận (nút đỏ) rồi gọi API xóa.
         case "delete": {
           const ok = await confirm({
             title: "Xóa đơn hàng?",
@@ -164,6 +180,7 @@ export function useOrderOperations({ reload, machineSuggestions }: { reload: () 
     [confirm, exec],
   );
 
+  // Gửi tên máy từ hộp hỏi: gọi API tương ứng; thành công thì đóng hộp.
   const submitMachine = useCallback(
     async (name: string) => {
       if (!machine) return false;
@@ -181,6 +198,7 @@ export function useOrderOperations({ reload, machineSuggestions }: { reload: () 
     [machine, exec],
   );
 
+  // Hộp hỏi tên máy (chỉ khi đang mở).
   const dialog = machine ? (
     <MachineDialog
       kind={machine.kind}

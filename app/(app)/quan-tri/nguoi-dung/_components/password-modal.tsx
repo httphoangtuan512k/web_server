@@ -1,4 +1,6 @@
 "use client";
+// File này: hộp thoại đổi mật khẩu cho một tài khoản.
+// Dùng ở: trang Người dùng, khi bấm nút "Đổi MK".
 
 import { useState } from "react";
 import { api, errorMessage } from "@/lib/api";
@@ -12,18 +14,22 @@ import type { UserAccount } from "./types";
 /** Đổi mật khẩu: PUT /api/users/:id/password { password }. */
 export function PasswordModal({ user, onClose }: { user: UserAccount; onClose: () => void }) {
   const toast = useToast();
+  // Hai ô mật khẩu, câu lỗi, và trạng thái đang lưu.
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // Bấm "Đổi mật khẩu": kiểm tra rồi gửi lên máy chủ.
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    // Kiểm tra độ dài và hai lần nhập phải giống nhau.
     if (pw.length < MIN_PASSWORD) return setError(`Mật khẩu phải có ít nhất ${MIN_PASSWORD} ký tự.`);
     if (pw !== pw2) return setError("Mật khẩu nhập lại không khớp.");
     setError("");
     setSaving(true);
     try {
+      // Gửi mật khẩu mới; thành công thì báo và đóng hộp thoại.
       await api.put(`/api/users/${user.id}/password`, { password: pw });
       toast.success(`Đã đổi mật khẩu cho ${user.username}.`);
       onClose();
@@ -35,6 +41,7 @@ export function PasswordModal({ user, onClose }: { user: UserAccount; onClose: (
   }
 
   return (
+    // Hộp thoại nhỏ: tiêu đề, mô tả, chân có nút "Hủy" và "Đổi mật khẩu".
     <Modal
       open
       onClose={onClose}
@@ -52,6 +59,7 @@ export function PasswordModal({ user, onClose }: { user: UserAccount; onClose: (
         </>
       }
     >
+      {/* Form 2 ô: mật khẩu mới và nhập lại */}
       <form id="password-form" onSubmit={submit} noValidate className="flex flex-col gap-4">
         <Field label="Mật khẩu mới" required hint={`Ít nhất ${MIN_PASSWORD} ký tự.`}>
           <Input type="password" value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" maxLength={200} autoFocus />

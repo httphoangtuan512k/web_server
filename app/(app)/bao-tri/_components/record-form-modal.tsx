@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: hộp thoại nhập / sửa bản ghi bảo trì (Sự cố + Sửa chữa, kèm ảnh).
+ * Dùng ở: nút "＋ Nhập dữ liệu" và nút Sửa (Super Admin) trên trang Bảo trì.
+ */
 
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
@@ -15,6 +19,7 @@ import { afterImageOf, faultImageOf, type MaintenanceInput, type MaintenanceReco
 export function RecordFormModal({ record, onClose, onSaved }: { record: MaintenanceRecord | null; onClose: () => void; onSaved: () => Promise<void> | void }) {
   const toast = useToast();
   const confirm = useConfirm();
+  // Giá trị ban đầu: rỗng khi tạo mới, lấy từ bản ghi khi sửa.
   const initial: MaintenanceInput = {
     equipment: record?.equipment || "",
     faultDescription: record?.fault_description || "",
@@ -23,11 +28,15 @@ export function RecordFormModal({ record, onClose, onSaved }: { record: Maintena
     afterStatus: record?.after_status || "",
     afterImage: record ? afterImageOf(record) : "",
   };
+  // Dữ liệu đang nhập và trạng thái đang lưu.
   const [f, setF] = useState<MaintenanceInput>(initial);
   const [saving, setSaving] = useState(false);
+  // dirty = đã sửa gì đó so với ban đầu.
   const dirty = (Object.keys(initial) as (keyof MaintenanceInput)[]).some((k) => initial[k] !== f[k]);
+  // Đổi giá trị một ô.
   const set = <K extends keyof MaintenanceInput>(k: K, v: MaintenanceInput[K]) => setF((s) => ({ ...s, [k]: v }));
 
+  // Đóng hộp: nếu đã nhập dở thì hỏi lại trước.
   async function requestClose() {
     if (saving) return;
     if (dirty && !(await confirm({ title: record ? "Đóng biểu mẫu chỉnh sửa?" : "Bỏ dữ liệu đang nhập?", message: "Các thay đổi chưa lưu sẽ bị mất.", confirmText: "Đóng" })))
@@ -35,6 +44,7 @@ export function RecordFormModal({ record, onClose, onSaved }: { record: Maintena
     onClose();
   }
 
+  // Lưu: bỏ khoảng trắng thừa, kiểm tra bắt buộc, gửi lên server.
   async function save(e: React.FormEvent) {
     e.preventDefault();
     const body: MaintenanceInput = {
@@ -47,6 +57,7 @@ export function RecordFormModal({ record, onClose, onSaved }: { record: Maintena
     if (!body.equipment || !body.faultDescription) return toast.error("Vui lòng nhập thiết bị và nội dung hư hỏng.");
     setSaving(true);
     try {
+      // Có bản ghi → sửa (PATCH); không có → tạo mới (POST).
       if (record) {
         await api.patch(`/api/maintenance/${record.id}`, { ...body });
         toast.success("Đã cập nhật bản ghi bảo trì.");
@@ -77,6 +88,7 @@ export function RecordFormModal({ record, onClose, onSaved }: { record: Maintena
       description="Sau khi lưu, bản ghi được đưa vào lịch sử. Chỉ Super Admin mới được sửa hoặc xóa dữ liệu đã lưu."
       footer={
         <>
+          {/* Nút Hủy và nút Lưu (quay vòng khi đang lưu) */}
           <button type="button" className={cn(btn.base, btn.secondary)} onClick={requestClose} disabled={saving}>
             {record ? "Hủy chỉnh sửa" : "Hủy"}
           </button>
@@ -87,9 +99,11 @@ export function RecordFormModal({ record, onClose, onSaved }: { record: Maintena
         </>
       }
     >
+      {/* Form 2 cột trên máy tính: Sự cố bên trái, Sửa chữa bên phải */}
       <form id="maintenance-form" onSubmit={save} className="grid gap-5 md:grid-cols-2">
         <fieldset className="space-y-4 md:border-r md:border-line md:pr-5">
           <legend className="mb-3 text-xs font-bold tracking-wide text-[#dc2626] uppercase">Sự cố</legend>
+          {/* Thiết bị, mô tả hư hỏng, ảnh hư hỏng */}
           <Field label="Thiết bị" required>
             <Input value={f.equipment} maxLength={180} placeholder="Ví dụ: Máy nghiền đứng số 1" onChange={(e) => set("equipment", e.target.value)} required autoFocus />
           </Field>
@@ -102,6 +116,7 @@ export function RecordFormModal({ record, onClose, onSaved }: { record: Maintena
         </fieldset>
         <fieldset className="space-y-4">
           <legend className="mb-3 text-xs font-bold tracking-wide text-[#0f766e] uppercase">Sửa chữa</legend>
+          {/* Nội dung sửa chữa, trạng thái sau sửa, ảnh sau sửa */}
           <Field label="Nội dung sửa chữa">
             <Textarea value={f.repairContent} placeholder="Các công việc đã thực hiện, vật tư thay thế..." onChange={(e) => set("repairContent", e.target.value)} />
           </Field>

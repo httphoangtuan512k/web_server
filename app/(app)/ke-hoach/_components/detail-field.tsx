@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: một ô thông tin (nhãn + giá trị) trong chi tiết đơn, Super Admin bấm ✎ để sửa tại chỗ.
+ * Dùng ở: order-detail-modal.tsx.
+ */
 
 import { Check, Loader2, Pencil, X } from "lucide-react";
 import { useState } from "react";
@@ -30,10 +34,12 @@ export function DetailField({
   /** Trả về true nếu lưu thành công. */
   onSave?: (next: string) => Promise<boolean>;
 }) {
+  // draft = chữ đang sửa (null = không sửa); saving = đang lưu.
   const [draft, setDraft] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const editing = draft !== null;
 
+  /** Lưu: không đổi thì thôi; lưu thành công thì thoát chế độ sửa. */
   async function commit() {
     if (draft === null || !onSave) return;
     if (draft.trim() === (value ?? "").trim()) return setDraft(null);
@@ -43,6 +49,7 @@ export function DetailField({
     if (ok) setDraft(null);
   }
 
+  // Phím tắt: Esc hủy; Enter lưu (ô nhiều dòng cần Ctrl/Cmd+Enter).
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
       // Không để <dialog> bắt Esc và đóng cả modal.
@@ -55,11 +62,14 @@ export function DetailField({
     }
   };
 
+  // Kiểu ô nhập khi sửa: viền xanh.
   const control =
     "w-full rounded-lg border border-brand-500 bg-surface px-2.5 py-1.5 text-sm text-fg shadow-sm focus:outline-none focus:ring-3 focus:ring-brand-500/15";
 
   return (
+    // Ô xám nhạt bo góc.
     <div className={cn("group min-w-0 rounded-xl border border-line bg-surface-2 px-3 py-2.5", editable && !editing && "hover:border-line-strong", className)}>
+      {/* Hàng trên: nhãn in hoa nhỏ + nút bút chì ✎ (chỉ khi được sửa). */}
       <div className="flex items-center justify-between gap-2">
         <p className="text-[11px] font-medium tracking-wide text-muted uppercase">{label}</p>
         {editable && !editing ? (
@@ -74,6 +84,7 @@ export function DetailField({
           </button>
         ) : null}
       </div>
+      {/* Đang sửa: ô nhập + nút ✓ lưu (xanh) + nút ✕ hủy. Không sửa: hiện giá trị. */}
       {editing ? (
         <div className="mt-1.5 flex items-start gap-1.5">
           {multiline ? (

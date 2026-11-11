@@ -1,4 +1,8 @@
 "use client";
+/**
+ * File này: toàn bộ trang Kế hoạch sản xuất – thống kê, lọc, danh sách đơn, các hộp thoại.
+ * Dùng ở: /ke-hoach. Màu dòng: trắng = chưa chạy, vàng = đang chạy/tạm dừng, xanh lá = đã xong.
+ */
 
 import { AlertCircle, ClipboardList, History, Printer, RefreshCw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -22,6 +26,7 @@ import type { Order, OrderGroup, OrderPerms, StatusFilter } from "./types";
 import { useOrders } from "./use-orders";
 import { fmtTons, groupOrders, isArchived, monthKey, sortGroups, statusKey, toNum } from "./utils";
 
+/** Trang Kế hoạch: chỉ người có quyền "kehoach" mới vào được. */
 export function KeHoachPage() {
   return (
     <PageGuard page="kehoach">
@@ -30,11 +35,14 @@ export function KeHoachPage() {
   );
 }
 
+/** Nội dung trang Kế hoạch (danh sách đơn, lọc, thống kê, các hộp thoại). */
 function KeHoach() {
+  // Người dùng + quyền, thông báo, dữ liệu đơn (tự làm mới 30 giây).
   const { me, isAdmin, canOrder } = useAuth();
   const toast = useToast();
   const { data, error, loadedAt, refreshing, reload } = useOrders();
 
+  // State: bộ lọc, đơn đang xem chi tiết, form tạo/sửa, ảnh đang xem, hộp lịch sử, đang xuất Excel.
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [detailKey, setDetailKey] = useState<string | null>(null);
   const [form, setForm] = useState<{ order: Order | null } | null>(null);
@@ -42,6 +50,7 @@ function KeHoach() {
   const [history, setHistory] = useState<{ query: string } | null>(null);
   const [exporting, setExporting] = useState(false);
 
+  // Tải lỗi → hiện thông báo đỏ.
   useEffect(() => {
     if (error) toast.error(`Lỗi tải dữ liệu: ${error}`);
   }, [error, toast]);
@@ -66,9 +75,11 @@ function KeHoach() {
     };
   }, [data, me, isAdmin, canOrder]);
 
+  // Gộp đơn theo nhóm; danh sách tháng có đơn; tháng đang chọn (nếu không còn thì "tất cả").
   const allGroups = useMemo(() => groupOrders(orders), [orders]);
   const months = useMemo(() => [...new Set(orders.map((o) => monthKey(o.createdAt)).filter(Boolean))].sort().reverse(), [orders]);
   const month = filters.month === "all" || months.includes(filters.month) ? filters.month : "all";
+  // Gợi ý tên máy từ các đơn đã có.
   const machineSuggestions = useMemo(
     () => [...new Set(orders.map((o) => o.machineName?.trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, "vi")),
     [orders],
@@ -79,6 +90,7 @@ function KeHoach() {
     const q = filters.packaging.trim().toLowerCase();
     const oq = filters.orderNumber.trim().toLowerCase();
     const searching = !!(q || oq);
+    // Lọc từng dòng: mã bao bì, số đơn, tháng, rồi đang hoạt động / lưu trữ.
     const rows = orders.filter((o) => {
       if (
         q &&
@@ -101,17 +113,21 @@ function KeHoach() {
       const archived = isArchived(o, loadedAt);
       return filters.view === "history" ? archived : !archived;
     });
+    // Gộp nhóm rồi sắp xếp ưu tiên.
     return sortGroups(groupOrders(rows));
   }, [orders, filters.packaging, filters.orderNumber, filters.view, month, loadedAt]);
 
+  // Đếm số đơn theo trạng thái (cho tab).
   const counts = useMemo(() => {
     const c: Record<StatusFilter, number> = { all: visible.length, new: 0, running: 0, paused: 0, completed: 0 };
     for (const g of visible) c[statusKey(g)]++;
     return c;
   }, [visible]);
 
+  // Danh sách hiển thị sau khi lọc theo tab trạng thái.
   const shown = useMemo(() => (filters.status === "all" ? visible : visible.filter((g) => statusKey(g) === filters.status)), [visible, filters.status]);
 
+  // Cộng tổng tấn: kế hoạch, đã sản xuất, còn lại (đang chạy), đã xong.
   const totals = useMemo(() => {
     let planned = 0;
     let produced = 0;
@@ -126,18 +142,23 @@ function KeHoach() {
     return { planned, produced, remaining, doneTons };
   }, [visible]);
 
+  // Các thao tác chạy/dừng/xác nhận/xóa + hộp hỏi tên máy.
   const { perform, pending, dialog } = useOrderOperations({ reload, machineSuggestions });
 
+  // Nhóm đơn đang mở chi tiết.
   const detail = detailKey ? (allGroups.find((g) => g.key === detailKey) ?? null) : null;
 
+  /** Xử lý bấm nút trên đơn: Xem → mở chi tiết; Sửa → mở form; còn lại → gọi thao tác. */
   function onAction(kind: OrderActionKind, g: OrderGroup) {
     if (kind === "view") return setDetailKey(g.key);
     if (kind === "edit") return setForm({ order: g.rows[0] ?? g });
+    // Xóa xong đơn đang mở chi tiết → đóng hộp chi tiết.
     perform(kind, g).then((done) => {
       if (done && kind === "delete" && g.rows.length <= 1 && detailKey === g.key) setDetailKey(null);
     });
   }
 
+  /** Bấm "↓ Xuất Excel": tải file Excel theo bộ lọc hiện tại. */
   async function exportExcel() {
     setExporting(true);
     try {
@@ -156,11 +177,14 @@ function KeHoach() {
     }
   }
 
+  // Đang tải lần đầu; hàm mở hộp lịch sử.
   const loading = !data && !error;
   const openHistory = () => setHistory({ query: "" });
 
   return (
+    // Nền xám xanh nhạt toàn trang.
     <div className="min-h-dvh bg-[#eef2f6] text-[#202832]">
+      {/* Thanh tiêu đề navy "Kế hoạch sản xuất": giờ cập nhật; nút Làm mới, Lịch sử, In (chỉ màn hình lớn). */}
       <PageTopbar
         title="Kế hoạch sản xuất"
         color="#173e66"
@@ -191,7 +215,7 @@ function KeHoach() {
       />
 
       <PageBody className="print:p-0">
-        {/* Tiêu đề khi in */}
+        {/* Tiêu đề chỉ hiện khi in. */}
         <div className="mb-4 hidden print:block">
           <h1 className="text-xl font-semibold">Kế hoạch sản xuất – SUPER WHITE</h1>
           <p className="text-sm">
@@ -199,6 +223,7 @@ function KeHoach() {
           </p>
         </div>
 
+        {/* 4 ô thống kê, vạch màu bên trái: tổng / mới tạo (trắng) / đang chạy (vàng) / đã chạy (xanh lá). */}
         <section className="no-print mb-3 grid grid-cols-2 gap-2.5 sm:mb-4 md:grid-cols-4 md:gap-3">
           <Stat label="Tổng đơn đang hiển thị" value={counts.all} loading={loading} accent="bg-[#173e66]" hint={`Kế hoạch ${fmtTons(totals.planned)} tấn`} />
           <Stat label="Đơn mới tạo" value={counts.new} loading={loading} accent="bg-white ring-1 ring-inset ring-[#9ba8b4]" hint="Chưa chạy máy" />
@@ -212,6 +237,7 @@ function KeHoach() {
           <Stat label="Đã chạy" value={counts.completed} loading={loading} accent="bg-[#70ca7a]" hint={`Sản lượng ${fmtTons(totals.doneTons)} tấn`} />
         </section>
 
+        {/* Thanh công cụ lọc; điện thoại có thêm 3 nút icon: lịch sử, in, làm mới. */}
         <OrderToolbar
           value={{ ...filters, month }}
           onChange={setFilters}
@@ -243,8 +269,10 @@ function KeHoach() {
           }
         />
 
+        {/* Khung trắng chứa tab trạng thái + danh sách đơn. */}
         <section className="overflow-hidden rounded-xl border border-[#c3cdd6] bg-white shadow-[0_2px_10px_rgba(15,23,42,0.05)] print:rounded-none print:border-0 print:shadow-none">
           {data ? <StatusTabs value={filters.status} onChange={(v) => setFilters((f) => ({ ...f, status: v }))} counts={counts} /> : null}
+          {/* Đang tải → khối xám; lỗi → "Thử lại"; không có đơn → "Xóa lọc" / "+ Tạo đơn"; có → danh sách. */}
           {loading ? (
             <div className="space-y-2 p-4">
               {Array.from({ length: 6 }, (_, i) => (
@@ -293,6 +321,7 @@ function KeHoach() {
         </section>
       </PageBody>
 
+      {/* Các hộp thoại, chỉ hiện khi được mở: chi tiết, tạo/sửa, lịch sử, xem ảnh, hỏi tên máy. */}
       {detail ? (
         <OrderDetailModal
           group={detail}
@@ -317,6 +346,7 @@ function KeHoach() {
 /** Ô thống kê như trang cũ (nhãn nhỏ + số lớn), dạng thẻ hiện đại; vạch màu = màu dòng tương ứng. */
 function Stat({ label, value, hint, accent, loading }: { label: string; value: number; hint?: string; accent: string; loading?: boolean }) {
   return (
+    // Thẻ trắng; vạch màu dọc bên trái; nhãn nhỏ, số lớn (khối xám khi đang tải), dòng phụ.
     <div className="relative min-w-0 overflow-hidden rounded-xl border border-[#d3dbe3] bg-white px-3.5 py-3 shadow-[0_2px_10px_rgba(15,23,42,0.05)] transition hover:shadow-[0_6px_18px_rgba(15,23,42,0.08)] sm:px-4 sm:py-3.5">
       <span className={cn("absolute inset-y-0 left-0 w-1.5", accent)} aria-hidden />
       <p className="text-xs leading-snug font-medium text-[#475767] sm:text-[13px]">{label}</p>

@@ -1,6 +1,11 @@
+/**
+ * File này: các khối giao diện cơ bản – thẻ (Card), nhãn màu (Badge), ô số liệu, trạng thái rỗng, vòng xoay tải.
+ * Dùng ở: hầu hết các trang.
+ */
 import { Loader2, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/cn";
 
+/** Thẻ trắng bo góc, viền mảnh, bóng nhẹ. */
 export function Card({ className, children, ...rest }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div className={cn("rounded-[var(--radius-card)] border border-line bg-surface shadow-card", className)} {...rest}>
@@ -9,6 +14,7 @@ export function Card({ className, children, ...rest }: React.HTMLAttributes<HTML
   );
 }
 
+/** Đầu thẻ: icon + tiêu đề + mô tả bên trái, nút bên phải. */
 export function CardHeader({
   title,
   description,
@@ -25,6 +31,7 @@ export function CardHeader({
   return (
     <div className={cn("flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4", className)}>
       <div className="flex min-w-0 items-start gap-3">
+        {/* Ô icon vuông nền xanh nhạt (nếu có). */}
         {Icon ? (
           <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-600">
             <Icon size={17} />
@@ -35,11 +42,13 @@ export function CardHeader({
           {description ? <p className="mt-0.5 text-[13px] text-muted">{description}</p> : null}
         </div>
       </div>
+      {/* Các nút bên phải (nếu có). */}
       {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
   );
 }
 
+/** Phần thân thẻ, có lề trong. */
 export function CardBody({ className, children }: { className?: string; children: React.ReactNode }) {
   return <div className={cn("p-5", className)}>{children}</div>;
 }
@@ -57,6 +66,7 @@ export function PageHeader({ title, description, actions }: { title: React.React
   );
 }
 
+// Bảng màu nhãn: xám, xanh, cam, xanh lá, vàng, đỏ, xanh dương.
 type Tone = "neutral" | "brand" | "accent" | "success" | "warning" | "danger" | "info";
 const tones: Record<Tone, string> = {
   neutral: "bg-surface-3 text-muted ring-line-strong",
@@ -68,6 +78,7 @@ const tones: Record<Tone, string> = {
   info: "bg-info-50 text-info-600 ring-info-600/20",
 };
 
+/** Nhãn tròn nhỏ có màu (vd trạng thái); dot = chấm tròn phía trước. */
 export function Badge({ tone = "neutral", dot, className, children }: { tone?: Tone; dot?: boolean; className?: string; children: React.ReactNode }) {
   return (
     <span className={cn("inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ring-1 ring-inset", tones[tone], className)}>
@@ -95,6 +106,7 @@ export function StatCard({
   tone?: "brand" | "accent" | "success" | "warning" | "danger";
   className?: string;
 }) {
+  // Màu ô icon theo tone.
   const iconTone = {
     brand: "bg-brand-50 text-brand-600",
     accent: "bg-accent-50 text-accent-600",
@@ -103,6 +115,7 @@ export function StatCard({
     danger: "bg-danger-50 text-danger-600",
   }[tone];
   return (
+    // Thẻ: nhãn + icon trên, số lớn + đơn vị giữa, ghi chú dưới.
     <Card className={cn("p-4", className)}>
       <div className="flex items-start justify-between gap-3">
         <p className="text-[13px] font-medium text-muted">{label}</p>
@@ -121,6 +134,7 @@ export function StatCard({
   );
 }
 
+/** Khi không có dữ liệu: icon tròn + dòng chữ + nút hành động (nếu có). */
 export function EmptyState({ icon: Icon, title, description, action }: { icon?: LucideIcon; title: string; description?: string; action?: React.ReactNode }) {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
@@ -136,6 +150,7 @@ export function EmptyState({ icon: Icon, title, description, action }: { icon?: 
   );
 }
 
+/** Vòng xoay + chữ "Đang tải…". */
 export function Spinner({ label = "Đang tải…", className }: { label?: string; className?: string }) {
   return (
     <div className={cn("flex items-center justify-center gap-2 py-10 text-sm text-muted", className)}>
@@ -145,6 +160,7 @@ export function Spinner({ label = "Đang tải…", className }: { label?: strin
   );
 }
 
+/** Khối xám nhấp nháy giữ chỗ khi đang tải. */
 export function Skeleton({ className }: { className?: string }) {
   return <div className={cn("animate-pulse rounded-md bg-surface-3", className)} />;
 }

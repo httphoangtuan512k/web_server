@@ -1,23 +1,32 @@
 "use client";
+/**
+ * File này: lưới thẻ 4 máy, mỗi thẻ liệt kê tên tag + giá trị PLC hiện tại (lọc theo ô tìm).
+ * Dùng ở: giữa trang Giám sát PLC (/plc).
+ */
 
 import { formatPlcValue, PLC_MACHINES } from "../../van-hanh/_shared/plc";
 import type { PlcLatestResponse } from "./types";
 
 /** Lưới giá trị tag realtime của 4 máy (machines.may1..may4) – như .machines/.machine/.value của trang cũ. */
 export function MachineTags({ latest, query, loading }: { latest: PlcLatestResponse | null; query: string; loading: boolean }) {
+  // Chữ lọc (viết thường để so sánh).
   const q = query.trim().toLocaleLowerCase("vi-VN");
   return (
+    // Lưới: 1 cột điện thoại, 2 cột màn vừa, 4 cột màn rộng.
     <div className="grid grid-cols-1 gap-3.5 min-[651px]:grid-cols-2 min-[1001px]:grid-cols-4">
       {PLC_MACHINES.map(({ id, label }) => {
+        // Lấy tag của máy, lọc theo tên nếu có chữ lọc.
         const data = latest?.payload?.machines?.[id] ?? {};
         const all = Object.entries(data);
         const entries = q ? all.filter(([name]) => name.toLocaleLowerCase("vi-VN").includes(q)) : all;
         return (
           <section key={id} className="min-w-0 rounded-xl border border-[#dbe3ed] bg-white p-3 shadow-[0_2px_8px_#0f172a0a] sm:p-4">
+            {/* Tên máy + số thông số */}
             <div className="mb-2.5 flex items-center justify-between gap-2">
               <h2 className="text-lg font-bold text-[#1e3a8a]">{label}</h2>
               <span className="num text-[13px] text-[#64748b]">{q ? `${entries.length}/${all.length}` : all.length} thông số</span>
             </div>
+            {/* Đang tải / chưa có dữ liệu / không khớp lọc / lưới tag */}
             {loading ? (
               <div className="rounded-lg bg-[#f8fafc] p-5 text-center text-[#64748b]">Đang tải dữ liệu {label.toLowerCase()}...</div>
             ) : !all.length ? (
@@ -26,6 +35,7 @@ export function MachineTags({ latest, query, loading }: { latest: PlcLatestRespo
               <div className="rounded-lg bg-[#f8fafc] p-5 text-center text-[#64748b]">Không có tag khớp bộ lọc.</div>
             ) : (
               <div className="grid grid-cols-2 gap-2">
+                {/* Mỗi tag một ô: tên nhỏ ở trên, giá trị đậm ở dưới */}
                 {entries.map(([name, value]) => (
                   <div key={name} className="min-w-0 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-[9px] transition-colors hover:border-[#bfdbfe] hover:bg-[#f1f7ff]">
                     <div className="text-xs [overflow-wrap:anywhere] text-[#64748b]" title={name}>
