@@ -1,14 +1,58 @@
 {
   "name": "superwhite",
+  "version": "1.0.0",
   "private": true,
-  "description": "SUPER WHITE – hệ thống quản lý sản xuất (apps/api + apps/web)",
-  "engines": { "node": ">=20" },
   "scripts": {
-    "setup": "npm ci --prefix apps/api && npm ci --prefix apps/web",
-    "dev": "node scripts/dev.mjs",
-    "build": "npm run build --prefix apps/api && npm run build --prefix apps/web",
-    "typecheck": "npm run typecheck --prefix apps/api && cd apps/web && npx tsc --noEmit",
-    "db:migrate": "npm run db:migrate --prefix apps/api",
-    "db:studio": "npm run db:studio --prefix apps/api"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "ts-node --transpile-only -P server/tsconfig.json server/scripts/db-migrate.ts",
+    "db:studio": "drizzle-kit studio",
+    "db:import": "ts-node --transpile-only -P server/tsconfig.json server/scripts/import-sqlite.ts",
+    "create-super-admin": "ts-node --transpile-only -P server/tsconfig.json server/scripts/create-super-admin.ts"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.9.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.61.0",
+    "next": "16.4.6",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "@nestjs/common": "^11.2.9",
+    "@nestjs/core": "^11.2.9",
+    "@nestjs/platform-express": "^11.2.9",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "drizzle-orm": "^0.45.4",
+    "exceljs": "^4.4.0",
+    "express": "^5.3.0",
+    "pg": "^8.23.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/turbopack": "4.3.3",
+    "@types/node": "^22.20.5",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.6",
+    "tailwindcss": "4.3.3",
+    "typescript": "5.9",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/express": "^5.0.6",
+    "@types/pg": "^8.23.1",
+    "better-sqlite3": "^13.0.3",
+    "dotenv": "^18.0.10",
+    "drizzle-kit": "^0.31.11",
+    "ts-node": "^10.9.2"
+  },
+  "description": "SUPER WHITE – hệ thống quản lý sản xuất (Next.js + NestJS, 1 ứng dụng)",
+  "engines": {
+    "node": ">=20"
   }
 }

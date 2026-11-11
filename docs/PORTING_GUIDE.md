@@ -6,8 +6,8 @@
 ## 0. Quy tắc làm việc chung
 
 - Chỉ sửa file trong phạm vi được giao. **Không sửa** các file dùng chung:
-  `apps/api/src/{db,auth,blob,common}/**`, `apps/api/src/app.module.ts`, `apps/api/src/db/schema.ts`, `apps/api/db/**`,
-  `apps/web/{lib,components/ui,components/shell}/**`, `apps/web/app/layout.tsx`, `apps/web/app/globals.css`, `package.json`, lockfile.
+  `server/src/{db,auth,blob,common}/**`, `server/src/app.module.ts`, `server/src/db/schema.ts`, `server/db/**`,
+  `{lib,components/ui,components/shell}/**`, `app/layout.tsx`, `app/globals.css`, `package.json`, lockfile.
   Cần đổi schema / thêm thư viện / sửa file dùng chung → **ghi vào báo cáo cuối** (lý do + đề xuất cụ thể), tạm thời xoay sở trong phạm vi của mình.
 - Không `npm install`. Thư viện có sẵn — API: `@nestjs/*`, `drizzle-orm`, `pg`, `exceljs`, `bcryptjs`, `@vercel/blob`. Web: `next@16`, `react@19`, `lucide-react`, `clsx`, `@vercel/blob`, Tailwind v4.
 - Không `git commit`/`push` (người điều phối sẽ làm).
@@ -16,24 +16,21 @@
 ## 1. Chạy & kiểm tra
 
 ```bash
-# API (apps/api) – .env đã trỏ DB local "superwhite_dev" (bản sao dữ liệu thật, thoải mái thử)
-npx tsc --noEmit -p tsconfig.json          # typecheck
-PORT=<cổng riêng> npm run dev              # chạy thử (ts-node-dev, transpile-only)
+# Ứng dụng duy nhất ở thư mục gốc – .env.local trỏ DB local "superwhite_dev" (bản sao dữ liệu thật, thoải mái thử)
+npm run typecheck && npm run lint
+npm run dev                                # http://localhost:3000 (web + API)
 # tài khoản test: dev_admin / DevAdmin#2026 (Super Admin)
-curl -c /tmp/ck -H 'content-type: application/json' -d '{"username":"dev_admin","password":"DevAdmin#2026"}' localhost:<cổng>/api/login
-curl -b /tmp/ck localhost:<cổng>/api/orders
+curl -c /tmp/ck -H 'content-type: application/json' -d '{"username":"dev_admin","password":"DevAdmin#2026"}' localhost:3000/api/login
+curl -b /tmp/ck localhost:3000/api/orders
 psql -d superwhite_dev                      # xem dữ liệu
 
-# Web (apps/web) – KHÔNG chạy `next dev`/`next build` (nhiều agent dùng chung thư mục .next)
-npx tsc --noEmit                           # typecheck
-npx eslint "app/(app)/<route>/**"           # lint phần của mình
 ```
 
-**Không bao giờ** dùng `.env.production.local` (Neon thật).
+`.env.neon` chứa thông tin Neon thật – chỉ dùng khi cố ý thao tác trên production.
 
 ## 2. Backend (NestJS 11 + Drizzle) – quy ước
 
-Mỗi phân hệ nằm trong `apps/api/src/modules/<tên>/` và đã được import vào `AppModule`. Khai báo controller/service trong `<tên>.module.ts` của mình.
+Mỗi phân hệ nằm trong `server/src/modules/<tên>/` và đã được import vào `AppModule`. Khai báo controller/service trong `<tên>.module.ts` của mình.
 
 ```ts
 import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
@@ -112,10 +109,10 @@ export class OrdersController {
 
 - Đây là bản **thiết kế lại** (chuyên nghiệp, gọn, responsive cho cả điện thoại/tablet ở xưởng) nhưng **giữ đủ 100% chức năng** của trang cũ.
   Trước khi viết, đọc kỹ file HTML cũ và liệt kê mọi chức năng (nút, bộ lọc, cột bảng, modal, quyền, in/xuất Excel, tự làm mới…) – tất cả phải có mặt.
-- Mỗi trang: `apps/web/app/(app)/<route>/page.tsx` (server component mỏng, chỉ khai báo `metadata` và render 1 client component) +
-  các component riêng trong `apps/web/app/(app)/<route>/_components/*.tsx` (`"use client"`). Có thể chia nhiều file; không dồn 1 file khổng lồ.
+- Mỗi trang: `app/(app)/<route>/page.tsx` (server component mỏng, chỉ khai báo `metadata` và render 1 client component) +
+  các component riêng trong `app/(app)/<route>/_components/*.tsx` (`"use client"`). Có thể chia nhiều file; không dồn 1 file khổng lồ.
 - Next 16 bật `cacheComponents`: **không** dùng `new Date()`/`Math.random()`/fetch ở server component; mọi dữ liệu lấy ở client component bằng `api` (`@/lib/api`).
-  Đọc `apps/web/node_modules/next/dist/docs/` nếu dùng API Next lạ.
+  Đọc `node_modules/next/dist/docs/` nếu dùng API Next lạ.
 - Dùng sẵn (không tự viết lại):
   - `@/lib/api` – `api.get/post/put/patch/delete/download`, `errorMessage(e)`; 401 tự về /login.
   - `@/lib/auth` – `useAuth()` → `{ me, isAdmin, can(page), canOrder(perm), refresh, logout }`.
@@ -133,7 +130,7 @@ export class OrdersController {
 - Ảnh: hiển thị `<img src={url}>` trực tiếp (URL `/api/files/...` cùng domain, có cookie). Chọn ảnh mới dùng `ImageInput`.
 - Tự làm mới định kỳ (nếu trang cũ có): `setInterval` trong `useEffect` + dọn dẹp, dừng khi tab ẩn (`document.visibilityState`).
 
-## 4. Ánh xạ schema cũ → mới (`apps/api/src/db/schema.ts`)
+## 4. Ánh xạ schema cũ → mới (`server/src/db/schema.ts`)
 
 | Cũ (SQLite) | Mới (Postgres) | Ghi chú |
 |---|---|---|

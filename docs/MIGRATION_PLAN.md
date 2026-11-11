@@ -18,24 +18,21 @@
 ## 2. Kiến trúc mới
 
 ```
-web_server/
-├── apps/api   NestJS 11 (TypeScript) – REST API, deploy thành 1 Vercel project (Root Directory = apps/api)
-│   ├── api/index.js        hàm serverless Vercel, bọc Nest app (cache giữa các lần gọi)
-│   ├── db/migrations/      migration SQL có version (sinh bởi drizzle-kit)
-│   ├── scripts/            migrate, import dữ liệu SQLite → Neon + ảnh → Blob, tạo super admin
-│   └── src/
-│       ├── db/             schema.ts (Drizzle – nguồn duy nhất của cấu trúc DB), DbService (Drizzle + SQL thuần, transaction)
-│       ├── blob/           BlobService (store private), /api/files/* (phục vụ ảnh), /api/uploads/token (upload trực tiếp)
-│       ├── auth/           đăng nhập, cookie ký HMAC + bảng user_sessions, Guard: đăng nhập / admin / super / quyền trang
-│       ├── common/         lỗi `{error}`, giờ VN, tiện ích
-│       └── modules/        users, orders, history, maintenance, backup, warehouse,
-│                           super-data, plc, documents, uploads
-└── apps/web   Next.js 16 (TypeScript) – giao diện, deploy thành Vercel project thứ 2 (Root Directory = apps/web)
-    ├── next.config.ts      rewrite `/api/*` → API_URL (cùng domain ⇒ cookie hoạt động), redirect `*.html` cũ
-    ├── proxy.ts            chưa đăng nhập → về trang đăng nhập
-    ├── components/ui       design system (Button, Card, Table, Modal, Toast, …) theo màu logo
-    └── app/                /login, / (tổng quan), /ke-hoach, /van-hanh, /plc, /kho, /bao-tri, /kcs, /xuat-hang,
-                            /tai-lieu, /quan-tri/{nguoi-dung,nhat-ky,he-thong,du-lieu}
+web_server/                 MỘT ứng dụng Next.js (Vercel project duy nhất, Root Directory = gốc repo)
+├── app/, components/, lib/ giao diện Next.js 16 – design system theo màu logo, sidebar theo quyền
+│                           /login, / (tổng quan), /ke-hoach, /van-hanh, /plc, /kho, /bao-tri, /kcs, /xuat-hang,
+│                           /tai-lieu, /quan-tri/{nguoi-dung,nhat-ky,he-thong,du-lieu}
+├── pages/api/[...path].ts  chuyển mọi /api/* vào NestJS trong cùng tiến trình (1 domain ⇒ cookie đơn giản)
+├── proxy.ts                chưa đăng nhập → về /login; redirect *.html cũ trong next.config.ts
+└── server/
+    ├── src/
+    │   ├── db/             schema.ts (Drizzle – nguồn duy nhất của cấu trúc DB), DbService (Drizzle + SQL thuần, transaction)
+    │   ├── blob/           BlobService (store private), /api/files/* (phục vụ ảnh), /api/uploads/token (upload trực tiếp)
+    │   ├── auth/           đăng nhập, cookie ký HMAC + bảng user_sessions, Guard: đăng nhập / admin / super / quyền trang
+    │   ├── common/         lỗi `{error}`, giờ VN
+    │   └── modules/        users, orders, history, maintenance, backup, warehouse, super-data, plc, documents
+    ├── db/migrations/      migration SQL có version (drizzle-kit)
+    └── scripts/            migrate, import dữ liệu SQLite → Neon + ảnh → Blob, tạo super admin
 ```
 
 **Nguyên tắc:** giữ nguyên **đường dẫn API, tham số và dạng JSON trả về** như `server.js`, kể cả mã HTTP và `{ error: "..." }` (danh sách ngoại lệ trong `PORTING_GUIDE.md` §2.1). Nhờ vậy chương trình C# gửi PLC chỉ cần đổi URL.
@@ -55,18 +52,17 @@ Thay vì chép 1:1 từ SQLite, schema được tối ưu để dễ nâng cấp
 
 | Biến | Dùng ở | Ghi chú |
 |---|---|---|
-| `DATABASE_URL` | api | Neon Postgres (URL pooler) |
-| `BLOB_READ_WRITE_TOKEN` | api | Vercel Blob store (ảnh, tài liệu, backup, xuất Excel) |
-| `SESSION_SECRET` | api | chuỗi ngẫu nhiên ≥ 32 ký tự để ký cookie |
-| `CRON_SECRET` | api | Vercel tự gửi kèm khi gọi cron |
-| `API_URL` | web | URL của project API, ví dụ `https://superwhite-api.vercel.app` |
+| `DATABASE_URL` | server | Neon Postgres (URL pooler) |
+| `BLOB_READ_WRITE_TOKEN` | server | Vercel Blob store (ảnh, tài liệu, backup, xuất Excel) |
+| `SESSION_SECRET` | server | chuỗi ngẫu nhiên ≥ 32 ký tự để ký cookie |
+| `CRON_SECRET` | server | Vercel tự gửi kèm khi gọi cron |
 
 Secret **không bao giờ commit**; chỉ để trong `.env` cục bộ (đã gitignore) và trong Vercel → Settings → Environment Variables.
 
 ## 4. Các giai đoạn
 
 ### Giai đoạn 0 – Nền tảng
-- [x] Clone repo, dựng monorepo `apps/api` + `apps/web`
+- [x] Clone repo, dựng ứng dụng Next.js + NestJS (gộp thành 1 ứng dụng, 1 project Vercel)
 - [x] Schema Drizzle + migration (mục 2b), áp dụng lên Neon
 - [x] DbService, BlobService, Auth (cookie ký HMAC + bảng `user_sessions`), Guard phân quyền, filter lỗi
 - [x] Upload trực tiếp từ trình duyệt lên Blob qua `/api/uploads/token` (vượt giới hạn 4,5 MB body của Vercel)
@@ -85,16 +81,16 @@ Secret **không bao giờ commit**; chỉ để trong `.env` cục bộ (đã gi
 - `kcs`, `xuathang`: hiện đang trống → làm trang "Đang phát triển"
 
 ### Giai đoạn 3 – Chuyển dữ liệu
-1. [x] `npm run db:migrate` (trong `apps/api`) tạo bảng trên Neon
+1. [x] `npm run db:migrate` tạo bảng trên Neon
 2. [x] `npm run db:import -- <web>/data/superwhite.db --excel-dir <web>/data/excel/files`: chuẩn hóa dữ liệu sang schema mới; ảnh base64 → Blob (tên theo hash, chạy lại không trùng); file Excel → Blob
 3. [x] Đối chiếu số dòng từng bảng (script tự in bảng so sánh) – khớp 100% lần đồng bộ 11/11/2026
 4. [ ] Trước khi chuyển hẳn: dừng server cũ, chạy lại `db:import -- … --wipe` với file `superwhite.db` mới nhất
 
 ### Giai đoạn 4 – Deploy Vercel
-1. Vercel → New Project → import repo → **Root Directory `apps/api`** → thêm biến môi trường → Deploy
-2. New Project thứ 2 → **Root Directory `apps/web`** → `API_URL` = URL bước 1 → Deploy
-3. Gắn Blob store + Neon vào project API (Storage tab) nếu chưa
-4. Cập nhật chương trình C# Máy B: đổi URL sang `https://<web>/api/plc/telemetry` (API key giữ nguyên vì hash đã được migrate)
+1. Vercel → New Project → import repo → giữ nguyên thiết lập (Next.js, gốc repo) → thêm 4 biến môi trường → Deploy
+2. Kiểm tra `https://<domain>/api/health` trả `{"ok":true}`, đăng nhập thử
+3. Gắn Blob store + Neon vào project (Storage tab) nếu chưa
+4. Cập nhật chương trình C# Máy B: đổi URL sang `https://<domain>/api/plc/telemetry` (API key giữ nguyên vì hash đã được migrate)
 5. Bỏ Cloudflare Tunnel; chạy song song 1–2 ngày rồi tắt server cũ
 
 ## 5. Rủi ro & cách xử lý
